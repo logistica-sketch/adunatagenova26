@@ -2150,8 +2150,7 @@ function aiAddMessage(tipo, testo) {
   div.innerHTML = testo
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-    .replace(/
-/g,'<br>');
+    .replace(/\n/g,'<br>');
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div;
