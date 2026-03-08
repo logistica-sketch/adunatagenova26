@@ -840,6 +840,21 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
 .ai-sug-btn:hover{background:#d4edda;}
 
 
+/* ── RICERCA RAPIDA DASHBOARD ── */
+.dash-search-input {
+  width:100%; height:42px; border:1.5px solid var(--border); border-radius:var(--r);
+  padding:0 14px 0 40px; font-family:'Geist',sans-serif; font-size:14px; color:var(--testo);
+  background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%238c959f' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.868-3.834zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E") no-repeat 12px center;
+  transition:border-color 0.15s, box-shadow 0.15s;
+}
+.dash-search-input:focus { outline:none; border-color:var(--verde); background-color:#fff; box-shadow:0 0 0 3px rgba(26,110,46,0.1); }
+.search-result-item { padding:11px 16px; border-bottom:1px solid var(--border); transition:background 0.1s; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.search-result-item:last-child { border-bottom:none; }
+.search-result-item:hover { background:#fafbfc; }
+.sri-nome { font-size:14px; font-weight:700; color:var(--testo); }
+.sri-meta { font-size:12px; color:var(--testo3); margin-top:3px; }
+.sri-tel { font-size:12px; color:var(--testo2); margin-top:2px; font-family:'Geist Mono',monospace; }
+
 /* ══════════════════════════════════════════════════════════════
    RESPONSIVE MOBILE
 ══════════════════════════════════════════════════════════════ */
@@ -1030,6 +1045,18 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
         <div class="page-title">Dashboard <small>Copertura turni</small></div>
         <button class="btn btn-secondary" onclick="renderDashboard()">↻ Aggiorna</button>
       </div>
+
+      <!-- RICERCA RAPIDA — solo ACCESSO FULL -->
+      <div class="panel" id="dash-search-panel" style="margin-bottom:20px;display:none">
+        <div class="panel-header"><span class="panel-title">🔍 Ricerca rapida volontari</span></div>
+        <div class="panel-body" style="padding-bottom:4px">
+          <input type="search" class="dash-search-input" id="dash-search-input"
+            placeholder="Cerca per nome, codice fiscale o telefono…"
+            autocomplete="off" oninput="ricercaVolontari(this.value)">
+          <div id="dash-search-results"></div>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-header"><span class="panel-title">📊 Copertura per turno</span></div>
         <div class="panel-body" id="dash-turni-prog"></div>
@@ -1505,6 +1532,51 @@ function percBadge(p) { return p >= 100 ? 'badge-green' : p >= 50 ? 'badge-orang
 // ══════════════════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
+// ── RICERCA RAPIDA VOLONTARI (ACCESSO FULL) ───────────────────
+let _searchTimer = null;
+
+function ricercaVolontari(q) {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => _eseguiRicercaVol(q), 280);
+}
+
+function _eseguiRicercaVol(q) {
+  const el = document.getElementById('dash-search-results');
+  q = (q || '').trim();
+  if (q.length < 2) { el.innerHTML = ''; return; }
+
+  const qq = q.toLowerCase();
+  const risultati = _volontari.filter(v =>
+    (v['NOME_COGNOME']  || '').toLowerCase().includes(qq) ||
+    (v['CODICE_FISCALE']|| '').toLowerCase().includes(qq) ||
+    (v['TELEFONO']      || '').toLowerCase().includes(qq)
+  ).slice(0, 25);
+
+  if (!risultati.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:20px 0"><div class="ei">🔍</div><p>Nessun volontario trovato</p></div>';
+    return;
+  }
+
+  el.innerHTML = '<div style="margin-top:10px">' + risultati.map(v => {
+    const turnoObj  = _turni.find(t => t['Etichetta'] === v['TURNO']);
+    const turnoTxt  = v['TURNO']
+      ? `${v['TURNO']}${turnoObj ? ' · ' + (turnoObj['NOME TURNO'] || '') : ''}`
+      : '—';
+    const varcoTxt  = v['VARCO'] ? `Varco ${v['VARCO']}` : 'Nessun varco';
+    const jollyBadge = v['JOLLY'] ? '<span class="badge badge-orange" style="font-size:11px">JOLLY</span>' : '';
+    const sezBadge   = v['SEZIONE'] ? `<span class="tag-sez">${v['SEZIONE']}</span>` : '';
+    return `
+      <div class="search-result-item">
+        <div style="min-width:0">
+          <div class="sri-nome">${v['NOME_COGNOME'] || '—'}</div>
+          <div class="sri-meta">${turnoTxt} &nbsp;·&nbsp; ${varcoTxt}</div>
+          ${v['TELEFONO'] ? `<div class="sri-tel">${v['TELEFONO']}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">${sezBadge}${jollyBadge}</div>
+      </div>`;
+  }).join('') + '</div>';
+}
+
 async function renderDashboard() {
   setLoading(true);
   try {
@@ -1514,6 +1586,10 @@ async function renderDashboard() {
       sb.from('VOLONTARI').select('*'),
     ]);
     _turni = turni || []; _varchi = varchi || []; _volontari = volontari || [];
+
+    // Mostra il pannello di ricerca solo per ACCESSO FULL
+    const sp = document.getElementById('dash-search-panel');
+    if (sp) sp.style.display = CU?.TIPOLOGIA === 'ACCESSO FULL' ? '' : 'none';
 
     const totSlot = _varchi.length * 2; // 25 varchi × 2 = 50 slot totali
 
