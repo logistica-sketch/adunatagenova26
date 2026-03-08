@@ -1559,9 +1559,7 @@ function _eseguiRicercaVol(q) {
 
   el.innerHTML = '<div style="margin-top:10px">' + risultati.map(v => {
     const turnoObj  = _turni.find(t => t['Etichetta'] === v['TURNO']);
-    const turnoTxt  = v['TURNO']
-      ? `${v['TURNO']}${turnoObj ? ' · ' + (turnoObj['NOME TURNO'] || '') : ''}`
-      : '—';
+    const turnoTxt  = turnoObj ? (turnoObj['NOME TURNO'] || v['TURNO']) : (v['TURNO'] || '—');
     const varcoTxt  = v['VARCO'] ? `Varco ${v['VARCO']}` : 'Nessun varco';
     const jollyBadge = v['JOLLY'] ? '<span class="badge badge-orange" style="font-size:11px">JOLLY</span>' : '';
     const sezBadge   = v['SEZIONE'] ? `<span class="tag-sez">${v['SEZIONE']}</span>` : '';
@@ -1615,7 +1613,7 @@ async function renderDashboard() {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-wrap:wrap;gap:6px">
             <div>
               <span style="font-size:15px;font-weight:700">${t['Etichetta']}</span>
-              <span style="color:var(--testo3);font-weight:400;font-size:13px;margin-left:8px">${t['NOME TURNO']||''} · ${t['FASCIA ORARIA']||''}</span>
+              <span style="color:var(--testo3);font-weight:400;font-size:13px;margin-left:8px">${t['FASCIA ORARIA']||''}</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <span style="font-size:12px;color:var(--testo3)">
@@ -2180,7 +2178,7 @@ function renderTurniForm(turni) {
       <div class="turno-block">
         <div class="turno-block-header">
           <div>
-            <div class="turno-block-title">${et} – ${t['NOME TURNO'] || ''}</div>
+            <div class="turno-block-title">${t['NOME TURNO'] || et}</div>
             <div class="turno-block-sub">${t['GIORNO'] || ''} · ${t['FASCIA ORARIA'] || ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -2360,7 +2358,7 @@ async function renderInserimentoMezzi() {
         onmouseover="this.style.borderColor='var(--verde)'" onmouseout="this.style.borderColor='var(--border)'">
         <input type="checkbox" value="${t['Etichetta']}" name="mezzo-turno"
           style="width:16px;height:16px;accent-color:var(--verde);cursor:pointer">
-        ${t['Etichetta']} – ${t['NOME TURNO'] || t['FASCIA ORARIA'] || ''}
+        ${t['NOME TURNO'] || t['Etichetta']}
       </label>`).join('');
 
     // Popola sezioni nel form (solo full può scegliere)
@@ -2564,7 +2562,7 @@ function scaricaExcelTurno() {
 
   // Intestazione riepilogo
   const rows = [];
-  rows.push([`RIEPILOGO TURNO: ${turno} – ${turnoObj['NOME TURNO']||''} – ${turnoObj['FASCIA ORARIA']||''}`]);
+  rows.push([`RIEPILOGO TURNO: ${turnoObj['NOME TURNO'] || turno}`]);
   rows.push([`Generato il: ${new Date().toLocaleDateString('it-IT')} alle ${new Date().toLocaleTimeString('it-IT')}`]);
   rows.push([]);
   rows.push(['VARCO', 'SEZIONE', 'VOL. 1 – NOME', 'VOL. 1 – CF', 'VOL. 1 – TEL', 'VOL. 1 – PC',
@@ -2760,7 +2758,7 @@ function _buildAiContext() {
       extra += nelVarco.slice(2).length;
     });
     const volTot = _volontari.filter(v => v['TURNO'] === t['Etichetta']).length;
-    return `  - ${t['Etichetta']} (${t['NOME TURNO']||''} ${t['FASCIA ORARIA']||''}): ${volTot} volontari totali, varchi completi=${completi} parziali=${parziali} scoperti=${scoperti} extra=${extra}`;
+    return `  - ${t['NOME TURNO'] || t['Etichetta']}: ${volTot} volontari totali, varchi completi=${completi} parziali=${parziali} scoperti=${scoperti} extra=${extra}`;
   }).join('\n');
 
   const sezioniMap = {};
