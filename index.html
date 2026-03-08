@@ -7,7 +7,967 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css">
+<style>
+:root {
+  --verde:#1a6e2e; --verde-light:#e6f4ea; --verde-mid:#4caf67;
+  --bg:#f4f5f7; --surface:#ffffff; --border:#e0e4ea;
+  --testo:#1c2128; --testo2:#57606a; --testo3:#8c959f;
+  --rosso:#cf222e; --rosso-light:#fff0f0;
+  --arancio:#e67e00; --arancio-light:#fff4e0;
+  --blu:#0969da; --blu-light:#e8f0fe;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.12);
+  --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Geist',sans-serif;background:var(--bg);color:var(--testo);font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* LOGIN */
+@keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+#login-screen{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  background:linear-gradient(to right,
+    #4caf50 0%, #81c784 20%, #f5f5f5 42%, #f5f5f5 58%, #e57373 80%, #f44336 100%);
+}
+#login-screen::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 40%, rgba(255,255,255,0.6) 0%, transparent 65%);
+  pointer-events:none;
+}
+.login-wrap{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;animation:slideUp 0.4s ease;}
+.login-logo{width:120px;height:120px;border-radius:50%;background:#fff;
+  box-shadow:0 4px 24px rgba(0,0,0,0.18);margin-bottom:20px;overflow:hidden;}
+.login-logo img{width:100%;height:100%;object-fit:cover;display:block;}
+.login-pretitle{font-family:'Geist',sans-serif;font-size:32px;font-weight:800;
+  color:#1c2128;letter-spacing:0.5px;margin-bottom:4px;text-align:center;}
+.login-subtitle{font-size:14px;color:#57606a;margin-bottom:28px;text-align:center;}
+.login-card{background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.13);
+  width:400px;max-width:92vw;padding:32px;}
+.login-label{display:block;font-size:12px;font-weight:700;color:var(--testo2);
+  letter-spacing:0.5px;margin-bottom:7px;}
+.login-input{width:100%;height:46px;border:1.5px solid #dde1e7;border-radius:10px;
+  padding:0 14px;font-family:'Geist',sans-serif;font-size:14px;color:var(--testo);
+  background:#f6f8fa;margin-bottom:18px;transition:border-color 0.15s,box-shadow 0.15s,background 0.15s;}
+.login-input:focus{outline:none;background:#fff;border-color:var(--verde);box-shadow:0 0 0 3px rgba(26,110,46,0.1);}
+.login-pw-wrap{position:relative;margin-bottom:18px;}
+.login-pw-wrap .login-input{margin-bottom:0;padding-right:46px;}
+.login-pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:var(--testo3);font-size:18px;padding:4px;line-height:1;}
+.login-btn{width:100%;height:48px;background:#1a6e2e;color:#fff;border:none;border-radius:10px;
+  font-family:'Geist',sans-serif;font-size:15px;font-weight:700;cursor:pointer;
+  transition:background 0.15s,transform 0.1s;letter-spacing:0.3px;margin-top:4px;}
+.login-btn:hover{background:#155925;}
+.login-btn:active{transform:scale(0.98);}
+.login-btn:disabled{opacity:0.6;cursor:not-allowed;}
+.login-err{background:var(--rosso-light);border:1px solid #ffc9c9;color:var(--rosso);
+  border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none;}
+.login-err.show{display:block;animation:shake 0.3s ease;}
+.login-footer{font-size:12px;color:#6e7781;margin-top:18px;text-align:center;}
+
+/* APP */
+#app{display:none;}
+.topbar{height:64px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:100;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.topbar-gif{width:46px;height:46px;border-radius:50%;overflow:hidden;border:2px solid var(--border);flex-shrink:0;}
+.topbar-gif img{width:100%;height:100%;object-fit:cover;display:block;}
+.topbar-brand{font-family:'Geist',sans-serif;font-size:20px;font-weight:800;color:var(--testo);}
+
+.topbar-logo-jpg{height:52px;width:auto;display:block;}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.topbar-user .name{font-size:13px;font-weight:700;text-align:right;}
+.topbar-user .role{font-size:11px;color:var(--testo3);text-align:right;}
+.btn-logout{height:32px;padding:0 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);font-family:'Geist',sans-serif;font-size:12px;font-weight:600;color:var(--testo2);cursor:pointer;transition:all 0.15s;}
+.btn-logout:hover{background:var(--rosso-light);border-color:#ffc9c9;color:var(--rosso);}
+
+.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto;}
+.nav-tab{height:44px;padding:0 16px;border:none;background:none;font-family:'Geist',sans-serif;font-size:13px;font-weight:600;color:var(--testo3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color 0.15s,border-color 0.15s;display:flex;align-items:center;gap:6px;}
+.nav-tab:hover{color:var(--testo);} .nav-tab.active{color:var(--verde);border-bottom-color:var(--verde);}
+
+.content{padding:28px 24px;max-width:1400px;margin:0 auto;}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.page-title{font-family:'Geist',sans-serif;font-size:26px;font-weight:800;color:var(--testo);line-height:1;}
+.page-title small{display:block;font-family:'Geist',sans-serif;font-size:12px;font-weight:500;color:var(--testo3);margin-top:4px;}
+
+/* PANEL */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;}
+.panel-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.panel-title{font-size:13px;font-weight:700;color:var(--testo);}
+.panel-body{padding:20px;}
+
+/* TABELLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead th{padding:9px 14px;background:var(--bg);font-size:11px;font-weight:700;color:var(--testo3);text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
+tbody td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc;}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-green{background:var(--verde-light);color:var(--verde);}
+.badge-orange{background:var(--arancio-light);color:var(--arancio);}
+.badge-red{background:var(--rosso-light);color:var(--rosso);}
+.badge-grey{background:#f0f1f3;color:var(--testo3);}
+.badge-blue{background:var(--blu-light);color:var(--blu);}
+.tag-full{display:inline-flex;align-items:center;gap:4px;background:#fff8e0;border:1px solid #f0d060;color:#7a5800;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.tag-sez{display:inline-flex;align-items:center;background:#f0f1f3;color:var(--testo3);padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+
+/* BOTTONI */
+.btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border-radius:var(--r);border:none;font-family:'Geist',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-primary{background:var(--verde);color:#fff;} .btn-primary:hover{background:#155925;}
+.btn-secondary{background:var(--bg);color:var(--testo2);border:1px solid var(--border);} .btn-secondary:hover{background:#eaedf1;}
+.btn-ghost{background:none;color:var(--verde);font-size:12px;padding:0 10px;height:28px;} .btn-ghost:hover{background:var(--verde-light);}
+.btn-danger{background:none;color:var(--rosso);font-size:12px;padding:0 10px;height:28px;} .btn-danger:hover{background:var(--rosso-light);}
+.btn-sm{height:28px;padding:0 12px;font-size:12px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:10px;box-shadow:var(--shadow-lg);width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;animation:modalIn 0.2s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.97) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-header{padding:18px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;cursor:pointer;color:var(--testo3);font-size:18px;line-height:1;padding:2px 6px;border-radius:4px;}
+.modal-close:hover{background:var(--bg);color:var(--testo);}
+.modal-body{padding:20px;} .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+
+/* FORM */
+.field-group{margin-bottom:16px;}
+.field-group label{display:block;font-size:11px;font-weight:700;color:var(--testo2);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;}
+.field-group input,.field-group select{width:100%;border:1.5px solid var(--border);border-radius:var(--r);padding:8px 12px;font-family:'Geist',sans-serif;font-size:14px;color:var(--testo);background:var(--bg);transition:border-color 0.15s,box-shadow 0.15s;}
+.field-group input:focus,.field-group select:focus{outline:none;border-color:var(--verde);background:#fff;box-shadow:0 0 0 3px rgba(26,110,46,0.1);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-alert{padding:10px 14px;border-radius:var(--r);font-size:13px;font-weight:500;margin-top:4px;display:none;}
+.form-alert.show{display:block;} .form-alert.err{background:var(--rosso-light);color:var(--rosso);border:1px solid #ffc9c9;} .form-alert.ok{background:var(--verde-light);color:var(--verde);border:1px solid #b4ddbf;}
+
+/* SEARCH */
+.search-input{height:36px;width:300px;max-width:100%;border:1.5px solid var(--border);border-radius:var(--r);padding:0 14px 0 36px;font-family:'Geist',sans-serif;font-size:13px;color:var(--testo);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%238c959f' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.868-3.834zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E") no-repeat 12px center;}
+.search-input:focus{outline:none;border-color:var(--verde);}
+
+/* LOADING */
+.loading-bar{position:fixed;top:0;left:0;height:3px;background:var(--verde-mid);z-index:9999;width:0;transition:width 0.3s ease;pointer-events:none;}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:48px 24px;color:var(--testo3);}
+.empty-state .ei{font-size:36px;margin-bottom:10px;}
+
+/* ── DASHBOARD ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;display:flex;align-items:center;gap:16px;}
+.stat-icon{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.stat-icon.green{background:var(--verde-light);} .stat-icon.orange{background:var(--arancio-light);} .stat-icon.blue{background:var(--blu-light);} .stat-icon.red{background:var(--rosso-light);}
+.stat-num{font-family:'Geist',sans-serif;font-size:32px;font-weight:800;line-height:1;}
+.stat-label{font-size:12px;font-weight:600;color:var(--testo2);margin-top:2px;}
+.stat-sub{font-size:11px;color:var(--testo3);margin-top:2px;}
+
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr;}}
+
+/* PROGRESS */
+.prog-wrap{background:#eef0f3;border-radius:20px;height:8px;overflow:hidden;flex:1;}
+.prog-fill{height:100%;border-radius:20px;background:var(--verde);transition:width 0.4s ease;}
+.prog-fill.warn{background:var(--arancio);}
+.prog-fill.danger{background:var(--rosso);}
+
+/* ── VOLONTARI PER SEZIONE ── */
+/* ── ACCORDION SEZIONI ── */
+.accordion-sez{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;}
+.accordion-sez-header{display:flex;align-items:center;gap:12px;padding:14px 20px;cursor:pointer;user-select:none;transition:background 0.15s;}
+.accordion-sez-header:hover{background:#fafbfc;}
+.accordion-arrow{font-size:12px;color:var(--testo3);transition:transform 0.2s;flex-shrink:0;}
+.accordion-arrow.open{transform:rotate(0deg);}
+.accordion-arrow.closed{transform:rotate(-90deg);}
+.accordion-sez-nome{font-size:15px;font-weight:800;color:var(--testo);flex:1;}
+.accordion-sez-count{font-size:13px;font-weight:600;color:var(--testo3);}
+.accordion-sez-body{border-top:1px solid var(--border);display:none;}
+.accordion-sez-body.open{display:block;}
+
+/* SEZIONE TABS */
+.sez-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg);}
+.sez-tab{padding:10px 20px;font-size:12px;font-weight:700;color:var(--testo3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;}
+.sez-tab:hover{color:var(--testo);}
+.sez-tab.active{color:var(--verde);border-bottom-color:var(--verde);background:var(--surface);}
+
+/* LISTA VOLONTARI ACCORDION */
+.vol-list-item{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+.vol-list-item:last-child{border-bottom:none;}
+.vol-list-item:hover{background:#fafbfc;}
+.vli-nome{font-size:14px;font-weight:700;color:var(--testo);}
+.vli-meta{font-size:12px;color:var(--testo3);margin-top:2px;}
+.vli-tel{font-size:12px;color:var(--testo2);margin-top:2px;}
+.vli-actions{display:flex;gap:4px;flex-shrink:0;margin-left:16px;}
+
+/* LISTA MEZZI ACCORDION */
+.mezzo-list-item{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+.mezzo-list-item:last-child{border-bottom:none;}
+.mezzo-list-item:hover{background:#fafbfc;}
+.mli-targa{font-size:14px;font-weight:700;color:var(--blu);font-family:'Geist Mono',monospace;}
+.mli-desc{font-size:12px;color:var(--testo2);margin-top:2px;}
+.mli-turni{font-size:12px;color:var(--testo3);margin-top:2px;}
+
+/* ── GESTIONE TURNI ── */
+.turno-selector{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+.turno-btn{height:36px;padding:0 16px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);font-family:'Geist',sans-serif;font-size:12px;font-weight:700;color:var(--testo2);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.turno-btn:hover{border-color:var(--verde);color:var(--verde);}
+.turno-btn.active{background:var(--verde);border-color:var(--verde);color:#fff;}
+
+/* STATS TURNO */
+.turno-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:20px;}
+@media(max-width:900px){.turno-stats{grid-template-columns:repeat(4,1fr);}}
+.ts-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;text-align:center;}
+.ts-num{font-family:'Geist',sans-serif;font-size:26px;font-weight:800;line-height:1;}
+.ts-label{font-size:11px;font-weight:600;color:var(--testo3);margin-top:2px;}
+.ts-num.verde{color:var(--verde);} .ts-num.blu{color:var(--blu);} .ts-num.arancio{color:var(--arancio);} .ts-num.rosso{color:var(--rosso);}
+
+/* BOX EXTRA */
+.extra-box{background:#fffbf0;border:1.5px solid #f5d9a0;border-radius:var(--r);padding:16px 20px;margin-bottom:20px;}
+.extra-box-title{font-size:13px;font-weight:700;color:var(--arancio);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.extra-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.extra-chip{background:#fff;border:1.5px solid #f5c070;border-radius:6px;padding:8px 12px;cursor:grab;transition:box-shadow 0.15s;}
+.extra-chip:active{cursor:grabbing;opacity:0.7;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+.extra-chip:hover{box-shadow:0 2px 8px rgba(230,126,0,0.2);}
+.ec-nome{font-size:12px;font-weight:700;color:var(--testo);}
+.ec-sez{font-size:11px;color:var(--testo3);margin-top:1px;}
+.ec-tel{font-size:11px;color:var(--testo2);margin-top:1px;}
+.ec-badge{display:inline-block;background:var(--arancio);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;margin-top:4px;letter-spacing:0.5px;}
+
+/* TABELLA VARCHI */
+.varchi-table-wrap{overflow-x:auto;}
+.varchi-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);}
+.varchi-table thead th{background:var(--bg);padding:10px 14px;font-size:11px;font-weight:700;color:var(--testo3);text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;}
+.varchi-table tbody td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.varchi-table tbody tr:last-child td{border-bottom:none;}
+.varchi-table tbody tr:hover td{background:#fafbfc;}
+.td-varco{width:50px;font-family:'Geist Mono',monospace;font-size:14px;font-weight:700;color:var(--testo);}
+.td-sezione{width:140px;font-size:13px;font-weight:600;color:var(--testo2);}
+.td-volontari{min-width:280px;}
+.td-mezzo{min-width:180px;}
+.td-stato{width:100px;text-align:center;}
+
+/* CHIP VOLONTARIO in tabella */
+.vol-chip-table{display:inline-flex;flex-direction:column;background:var(--verde-light);border:1px solid #b4ddbf;border-radius:6px;padding:7px 10px;margin:3px;min-width:130px;cursor:grab;position:relative;transition:box-shadow 0.15s;}
+.vol-chip-table:hover{box-shadow:0 2px 8px rgba(26,110,46,0.15);}
+.vol-chip-table:active{cursor:grabbing;opacity:0.7;}
+.vol-chip-table.extra{background:var(--arancio-light);border-color:#f5d9a0;}
+.vc-nome{font-size:12px;font-weight:700;color:var(--testo);}
+.vc-sez{font-size:11px;color:var(--testo3);margin-top:1px;}
+.vc-tel{font-size:11px;color:var(--testo2);margin-top:1px;font-family:'Geist Mono',monospace;}
+.vc-badge-extra{display:inline-block;background:var(--arancio);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;margin-top:4px;letter-spacing:0.5px;align-self:flex-start;}
+.vc-remove{position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;color:var(--testo3);font-size:12px;opacity:0;transition:opacity 0.15s;line-height:1;padding:2px;}
+.vol-chip-table:hover .vc-remove{opacity:1;}
+.vc-remove:hover{color:var(--rosso);}
+
+/* CHIP MEZZO in tabella */
+.mezzo-chip{display:flex;flex-direction:column;background:var(--blu-light);border:1px solid #c0d4f5;border-radius:6px;padding:7px 10px;cursor:grab;position:relative;transition:box-shadow 0.15s;}
+.mezzo-chip:hover{box-shadow:0 2px 8px rgba(9,105,218,0.15);}
+.mezzo-chip:active{cursor:grabbing;opacity:0.7;}
+.mc-targa{font-size:12px;font-weight:700;color:var(--blu);font-family:'Geist Mono',monospace;}
+.mc-desc{font-size:11px;color:var(--testo2);margin-top:2px;}
+.mc-tipo{font-size:10px;color:var(--testo3);margin-top:1px;text-transform:uppercase;letter-spacing:0.3px;}
+.mc-remove{position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;color:var(--testo3);font-size:12px;opacity:0;transition:opacity 0.15s;line-height:1;padding:2px;}
+.mezzo-chip:hover .mc-remove{opacity:1;}
+.mc-remove:hover{color:var(--rosso);}
+
+/* STATO BADGE */
+.stato-completo{background:#e6f4ea;color:#1a6e2e;border:1px solid #b4ddbf;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:0.3px;}
+.stato-parziale{background:#fff4e0;color:#9a6600;border:1px solid #f5d9a0;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;}
+.stato-scoperto{background:#fff0f0;color:#cf222e;border:1px solid #ffc9c9;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;}
+.stato-surplus{background:#e8f0fe;color:#0969da;border:1px solid #c0d4f5;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;}
+
+/* SLOT VUOTO / ADD */
+.slot-drop-zone{border:1.5px dashed var(--border);border-radius:6px;padding:8px 12px;color:var(--testo3);font-size:12px;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:4px;margin:3px;}
+.slot-drop-zone:hover{border-color:var(--verde);color:var(--verde);background:var(--verde-light);}
+.slot-drop-target{border:2px dashed var(--verde)!important;background:var(--verde-light)!important;}
+.nessun-mezzo{font-size:11px;color:var(--rosso);font-style:italic;cursor:pointer;}
+.nessun-mezzo:hover{text-decoration:underline;}
+
+
+/* ── INSERIMENTO VOLONTARI ── */
+.turno-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden;}
+.turno-block-header{background:var(--verde-light);border-bottom:1px solid #b4ddbf;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}
+.turno-block-title{font-family:'Geist',sans-serif;font-size:18px;font-weight:800;color:var(--verde);}
+.turno-block-sub{font-size:12px;color:var(--verde);opacity:0.7;}
+.turno-block-body{padding:20px;}
+.vol-entry{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;position:relative;}
+.vol-entry-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.vol-entry-num{font-size:13px;font-weight:700;color:var(--testo2);}
+.vol-entry-remove{background:none;border:none;cursor:pointer;color:var(--rosso);font-size:18px;line-height:1;padding:0 4px;opacity:0.6;}
+.vol-entry-remove:hover{opacity:1;}
+.vol-fields{display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:12px;align-items:end;}
+@media(max-width:700px){.vol-fields{grid-template-columns:1fr;}}
+.vol-fields .field-group{margin-bottom:0;}
+.nonpc-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--testo2);}
+.nonpc-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--verde);cursor:pointer;}
+.add-vol-btn{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--verde);cursor:pointer;padding:8px 12px;border-radius:var(--r);border:1.5px dashed var(--verde-mid);background:none;width:100%;transition:all 0.15s;margin-top:4px;}
+.add-vol-btn:hover{background:var(--verde-light);}
+.jolly-notice{display:inline-flex;align-items:center;gap:4px;background:var(--arancio-light);border:1px solid #f5d9a0;color:var(--arancio);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;margin-left:10px;}
+
+/* MONO */
+.mono{font-family:'Geist Mono',monospace;font-size:12px;}
+
+/* ── AI CHAT FLOTTANTE ─────────────────────────────────────── */
+#ai-fab{position:fixed;bottom:24px;right:24px;z-index:9999;
+  width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a6e2e,#2d8a45);
+  border:none;cursor:pointer;box-shadow:0 4px 20px rgba(26,110,46,0.4);
+  display:none;align-items:center;justify-content:center;font-size:24px;
+  transition:transform 0.2s,box-shadow 0.2s;}
+#ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(26,110,46,0.5);}
+#ai-fab.pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid rgba(26,110,46,0.4);animation:pulsering 1.5s ease-out infinite;}
+@keyframes pulsering{0%{transform:scale(1);opacity:1;}100%{transform:scale(1.5);opacity:0;}}
+
+#ai-panel{position:fixed;bottom:90px;right:24px;z-index:9998;
+  width:420px;max-width:calc(100vw - 32px);height:560px;max-height:calc(100vh - 120px);
+  background:#fff;border-radius:16px;box-shadow:0 8px 48px rgba(0,0,0,0.18);
+  display:none;flex-direction:column;overflow:hidden;
+  animation:slideUpChat 0.25s ease;}
+@keyframes slideUpChat{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+#ai-panel-header{background:linear-gradient(135deg,#1a6e2e,#2d8a45);padding:14px 18px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.ai-header-left{display:flex;align-items:center;gap:10px;}
+.ai-avatar{width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:16px;}
+.ai-header-title{color:#fff;font-weight:700;font-size:14px;}
+.ai-header-sub{color:rgba(255,255,255,0.7);font-size:11px;margin-top:1px;}
+#ai-close{background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;
+  font-size:18px;padding:4px;line-height:1;}
+#ai-close:hover{color:#fff;}
+
+#ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.ai-msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;}
+.ai-msg.user{background:#1a6e2e;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.ai-msg.assistant{background:#f6f8fa;color:var(--testo);align-self:flex-start;border-bottom-left-radius:4px;border:1px solid var(--border);}
+.ai-msg.thinking{background:#f6f8fa;color:var(--testo3);align-self:flex-start;font-style:italic;border:1px solid var(--border);}
+.ai-msg pre{background:#e8ecef;border-radius:6px;padding:8px;font-size:11px;overflow-x:auto;margin:6px 0 0;}
+
+#ai-input-wrap{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+#ai-input{flex:1;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;
+  font-family:'Geist',sans-serif;font-size:13px;resize:none;height:38px;max-height:100px;
+  transition:border-color 0.15s;line-height:1.5;overflow-y:auto;}
+#ai-input:focus{outline:none;border-color:var(--verde);}
+#ai-send{width:38px;height:38px;background:#1a6e2e;border:none;border-radius:10px;
+  cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;transition:background 0.15s;}
+#ai-send:hover{background:#155925;}
+#ai-send:disabled{opacity:0.5;cursor:not-allowed;}
+
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px;}
+.ai-sug-btn{background:#f0f7f2;border:1px solid #b4ddbf;color:#1a6e2e;border-radius:20px;
+  padding:5px 12px;font-size:11px;cursor:pointer;transition:background 0.15s;font-family:'Geist',sans-serif;}
+.ai-sug-btn:hover{background:#d4edda;}
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   HAMBURGER MENU + DRAWER MOBILE
+══════════════════════════════════════════════════════════════ */
+.hamburger {
+  display:none;
+  background:none;border:none;cursor:pointer;
+  padding:6px;color:var(--testo);font-size:22px;line-height:1;
+  flex-shrink:0;
+}
+.drawer-overlay {
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9990;
+  opacity:0;transition:opacity 0.25s;
+}
+.drawer-overlay.open { opacity:1; }
+.drawer {
+  position:fixed;top:0;left:0;bottom:0;width:280px;max-width:85vw;
+  background:#fff;z-index:9991;
+  transform:translateX(-100%);transition:transform 0.28s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;box-shadow:4px 0 24px rgba(0,0,0,0.15);
+}
+.drawer.open { transform:translateX(0); }
+.drawer-header {
+  background:linear-gradient(135deg,#1a6e2e,#2d8a45);
+  padding:20px 18px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;
+}
+.drawer-header img { width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.4); }
+.drawer-user-name { color:#fff;font-weight:800;font-size:15px; }
+.drawer-user-role { color:rgba(255,255,255,0.75);font-size:12px;margin-top:2px; }
+.drawer-nav { flex:1;overflow-y:auto;padding:10px 0; }
+.drawer-tab {
+  display:flex;align-items:center;gap:12px;
+  padding:13px 20px;font-size:14px;font-weight:600;
+  color:var(--testo);cursor:pointer;transition:background 0.15s;
+  border:none;background:none;width:100%;text-align:left;
+  font-family:'Geist',sans-serif;
+}
+.drawer-tab:hover { background:#f0f7f2; }
+.drawer-tab.active { color:var(--verde);background:#f0f7f2;border-left:3px solid var(--verde); }
+.drawer-footer {
+  padding:14px 16px;border-top:1px solid var(--border);flex-shrink:0;
+}
+.drawer-logout {
+  width:100%;height:40px;background:none;border:1.5px solid var(--rosso);
+  color:var(--rosso);border-radius:8px;font-family:'Geist',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s;
+}
+.drawer-logout:hover { background:var(--rosso-light); }
+
+@media (max-width: 768px) {
+  .hamburger { display:flex;align-items:center;justify-content:center; }
+
+  /* Topbar semplificata */
+  .topbar {
+    height:54px; padding:0 12px;
+    display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:100;
+  }
+  .topbar-left { gap:8px; flex:1; min-width:0; }
+  .topbar-brand { font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .topbar-gif { width:34px;height:34px; }
+  .topbar-logo-jpg { display:none; }
+  /* Nascondi user + logout dalla topbar su mobile (sono nel drawer) */
+  .topbar-right { display:none !important; }
+  /* Nascondi navbar su mobile (è nel drawer) */
+  .navbar { display:none; }
+
+  /* Content full width */
+  .content { padding:12px 10px; }
+  .page-header { margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  .page-title { font-size:16px; }
+  .panel-header { padding:10px 12px; flex-wrap:wrap; gap:8px; }
+  .panel-body { padding:12px; }
+  .panel-title { font-size:13px; }
+
+  /* Dashboard */
+  #dash-turni-prog > div > div:first-child { flex-direction:column !important; align-items:flex-start !important; gap:4px !important; }
+
+  /* Turni selector */
+  #turni-selector { flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px; }
+  .turno-btn { font-size:11px;padding:0 10px;height:32px;flex-shrink:0; }
+
+  /* Stats */
+  .turno-stats { grid-template-columns:repeat(4,1fr) !important;gap:4px; }
+  .ts-num { font-size:14px; }
+  .ts-label { font-size:9px; }
+  .ts-card { padding:6px 4px; }
+
+  /* Tabella */
+  .table-wrap { overflow-x:auto;-webkit-overflow-scrolling:touch; }
+  table { min-width:580px;font-size:12px; }
+  .td-volontari { min-width:180px; }
+  .td-mezzo { min-width:130px; }
+  .vol-chip-table { min-width:100px;font-size:10px;padding:4px 6px; }
+  .vc-nome { font-size:10px; }
+  .vc-sez,.vc-tel { font-size:9px; }
+
+  /* Accordion */
+  .vli-nome { font-size:13px; }
+  .vli-meta,.vli-tel { font-size:11px; }
+  .vol-list-item { padding:8px 12px; }
+
+  /* Form */
+  .vol-fields { grid-template-columns:1fr !important; }
+
+  /* Modali */
+  .modal { width:96vw !important;max-width:96vw !important; }
+  .modal-body { padding:12px; }
+  .modal-footer { padding:10px 12px;flex-wrap:wrap;gap:8px; }
+
+  /* Login */
+  .login-card { padding:20px 16px;width:92vw; }
+  .login-pretitle { font-size:22px; }
+  .login-logo { width:80px;height:80px; }
+
+  /* Beppe chat a schermo intero */
+  #ai-panel { position:fixed;left:0;right:0;bottom:0;top:0;width:100vw !important;height:100vh !important;max-height:100vh !important;border-radius:0;z-index:10000; }
+  #ai-fab { bottom:16px;right:16px;width:48px;height:48px; }
+  #ai-input { font-size:16px; }
+  #ai-send { width:40px;height:40px;flex-shrink:0; }
+
+  .turni-check-grid { grid-template-columns:1fr 1fr !important; }
+}
+@media (max-width:400px) {
+  .turno-stats { grid-template-columns:repeat(3,1fr) !important; }
+  .topbar-brand { font-size:13px; }
+  .content { padding:8px; }
+}
+.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --verde:#1a6e2e; --verde-light:#e6f4ea; --verde-mid:#4caf67;
+  --bg:#f4f5f7; --surface:#ffffff; --border:#e0e4ea;
+  --testo:#1c2128; --testo2:#57606a; --testo3:#8c959f;
+  --rosso:#cf222e; --rosso-light:#fff0f0;
+  --arancio:#e67e00; --arancio-light:#fff4e0;
+  --blu:#0969da; --blu-light:#e8f0fe;
+  --shadow:0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg:0 8px 32px rgba(0,0,0,0.12);
+  --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Geist',sans-serif;background:var(--bg);color:var(--testo);font-size:14px;line-height:1.5;min-height:100vh;}
+
+/* LOGIN */
+@keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+#login-screen{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  background:linear-gradient(to right,
+    #4caf50 0%, #81c784 20%, #f5f5f5 42%, #f5f5f5 58%, #e57373 80%, #f44336 100%);
+}
+#login-screen::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 40%, rgba(255,255,255,0.6) 0%, transparent 65%);
+  pointer-events:none;
+}
+.login-wrap{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;animation:slideUp 0.4s ease;}
+.login-logo{width:120px;height:120px;border-radius:50%;background:#fff;
+  box-shadow:0 4px 24px rgba(0,0,0,0.18);margin-bottom:20px;overflow:hidden;}
+.login-logo img{width:100%;height:100%;object-fit:cover;display:block;}
+.login-pretitle{font-family:'Geist',sans-serif;font-size:32px;font-weight:800;
+  color:#1c2128;letter-spacing:0.5px;margin-bottom:4px;text-align:center;}
+.login-subtitle{font-size:14px;color:#57606a;margin-bottom:28px;text-align:center;}
+.login-card{background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.13);
+  width:400px;max-width:92vw;padding:32px;}
+.login-label{display:block;font-size:12px;font-weight:700;color:var(--testo2);
+  letter-spacing:0.5px;margin-bottom:7px;}
+.login-input{width:100%;height:46px;border:1.5px solid #dde1e7;border-radius:10px;
+  padding:0 14px;font-family:'Geist',sans-serif;font-size:14px;color:var(--testo);
+  background:#f6f8fa;margin-bottom:18px;transition:border-color 0.15s,box-shadow 0.15s,background 0.15s;}
+.login-input:focus{outline:none;background:#fff;border-color:var(--verde);box-shadow:0 0 0 3px rgba(26,110,46,0.1);}
+.login-pw-wrap{position:relative;margin-bottom:18px;}
+.login-pw-wrap .login-input{margin-bottom:0;padding-right:46px;}
+.login-pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:var(--testo3);font-size:18px;padding:4px;line-height:1;}
+.login-btn{width:100%;height:48px;background:#1a6e2e;color:#fff;border:none;border-radius:10px;
+  font-family:'Geist',sans-serif;font-size:15px;font-weight:700;cursor:pointer;
+  transition:background 0.15s,transform 0.1s;letter-spacing:0.3px;margin-top:4px;}
+.login-btn:hover{background:#155925;}
+.login-btn:active{transform:scale(0.98);}
+.login-btn:disabled{opacity:0.6;cursor:not-allowed;}
+.login-err{background:var(--rosso-light);border:1px solid #ffc9c9;color:var(--rosso);
+  border-radius:8px;padding:10px 14px;font-size:13px;font-weight:500;margin-bottom:16px;display:none;}
+.login-err.show{display:block;animation:shake 0.3s ease;}
+.login-footer{font-size:12px;color:#6e7781;margin-top:18px;text-align:center;}
+
+/* APP */
+#app{display:none;}
+.topbar{height:64px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:100;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.topbar-gif{width:46px;height:46px;border-radius:50%;overflow:hidden;border:2px solid var(--border);flex-shrink:0;}
+.topbar-gif img{width:100%;height:100%;object-fit:cover;display:block;}
+.topbar-brand{font-family:'Geist',sans-serif;font-size:20px;font-weight:800;color:var(--testo);}
+
+.topbar-logo-jpg{height:52px;width:auto;display:block;}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.topbar-user .name{font-size:13px;font-weight:700;text-align:right;}
+.topbar-user .role{font-size:11px;color:var(--testo3);text-align:right;}
+.btn-logout{height:32px;padding:0 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);font-family:'Geist',sans-serif;font-size:12px;font-weight:600;color:var(--testo2);cursor:pointer;transition:all 0.15s;}
+.btn-logout:hover{background:var(--rosso-light);border-color:#ffc9c9;color:var(--rosso);}
+
+.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto;}
+.nav-tab{height:44px;padding:0 16px;border:none;background:none;font-family:'Geist',sans-serif;font-size:13px;font-weight:600;color:var(--testo3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color 0.15s,border-color 0.15s;display:flex;align-items:center;gap:6px;}
+.nav-tab:hover{color:var(--testo);} .nav-tab.active{color:var(--verde);border-bottom-color:var(--verde);}
+
+.content{padding:28px 24px;max-width:1400px;margin:0 auto;}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.page-title{font-family:'Geist',sans-serif;font-size:26px;font-weight:800;color:var(--testo);line-height:1;}
+.page-title small{display:block;font-family:'Geist',sans-serif;font-size:12px;font-weight:500;color:var(--testo3);margin-top:4px;}
+
+/* PANEL */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;}
+.panel-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.panel-title{font-size:13px;font-weight:700;color:var(--testo);}
+.panel-body{padding:20px;}
+
+/* TABELLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead th{padding:9px 14px;background:var(--bg);font-size:11px;font-weight:700;color:var(--testo3);text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
+tbody td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc;}
+
+/* BADGE */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+.badge-green{background:var(--verde-light);color:var(--verde);}
+.badge-orange{background:var(--arancio-light);color:var(--arancio);}
+.badge-red{background:var(--rosso-light);color:var(--rosso);}
+.badge-grey{background:#f0f1f3;color:var(--testo3);}
+.badge-blue{background:var(--blu-light);color:var(--blu);}
+.tag-full{display:inline-flex;align-items:center;gap:4px;background:#fff8e0;border:1px solid #f0d060;color:#7a5800;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.tag-sez{display:inline-flex;align-items:center;background:#f0f1f3;color:var(--testo3);padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+
+/* BOTTONI */
+.btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 16px;border-radius:var(--r);border:none;font-family:'Geist',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-primary{background:var(--verde);color:#fff;} .btn-primary:hover{background:#155925;}
+.btn-secondary{background:var(--bg);color:var(--testo2);border:1px solid var(--border);} .btn-secondary:hover{background:#eaedf1;}
+.btn-ghost{background:none;color:var(--verde);font-size:12px;padding:0 10px;height:28px;} .btn-ghost:hover{background:var(--verde-light);}
+.btn-danger{background:none;color:var(--rosso);font-size:12px;padding:0 10px;height:28px;} .btn-danger:hover{background:var(--rosso-light);}
+.btn-sm{height:28px;padding:0 12px;font-size:12px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:10px;box-shadow:var(--shadow-lg);width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;animation:modalIn 0.2s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.97) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-header{padding:18px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;cursor:pointer;color:var(--testo3);font-size:18px;line-height:1;padding:2px 6px;border-radius:4px;}
+.modal-close:hover{background:var(--bg);color:var(--testo);}
+.modal-body{padding:20px;} .modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+
+/* FORM */
+.field-group{margin-bottom:16px;}
+.field-group label{display:block;font-size:11px;font-weight:700;color:var(--testo2);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;}
+.field-group input,.field-group select{width:100%;border:1.5px solid var(--border);border-radius:var(--r);padding:8px 12px;font-family:'Geist',sans-serif;font-size:14px;color:var(--testo);background:var(--bg);transition:border-color 0.15s,box-shadow 0.15s;}
+.field-group input:focus,.field-group select:focus{outline:none;border-color:var(--verde);background:#fff;box-shadow:0 0 0 3px rgba(26,110,46,0.1);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-alert{padding:10px 14px;border-radius:var(--r);font-size:13px;font-weight:500;margin-top:4px;display:none;}
+.form-alert.show{display:block;} .form-alert.err{background:var(--rosso-light);color:var(--rosso);border:1px solid #ffc9c9;} .form-alert.ok{background:var(--verde-light);color:var(--verde);border:1px solid #b4ddbf;}
+
+/* SEARCH */
+.search-input{height:36px;width:300px;max-width:100%;border:1.5px solid var(--border);border-radius:var(--r);padding:0 14px 0 36px;font-family:'Geist',sans-serif;font-size:13px;color:var(--testo);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%238c959f' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.868-3.834zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E") no-repeat 12px center;}
+.search-input:focus{outline:none;border-color:var(--verde);}
+
+/* LOADING */
+.loading-bar{position:fixed;top:0;left:0;height:3px;background:var(--verde-mid);z-index:9999;width:0;transition:width 0.3s ease;pointer-events:none;}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:48px 24px;color:var(--testo3);}
+.empty-state .ei{font-size:36px;margin-bottom:10px;}
+
+/* ── DASHBOARD ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;display:flex;align-items:center;gap:16px;}
+.stat-icon{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.stat-icon.green{background:var(--verde-light);} .stat-icon.orange{background:var(--arancio-light);} .stat-icon.blue{background:var(--blu-light);} .stat-icon.red{background:var(--rosso-light);}
+.stat-num{font-family:'Geist',sans-serif;font-size:32px;font-weight:800;line-height:1;}
+.stat-label{font-size:12px;font-weight:600;color:var(--testo2);margin-top:2px;}
+.stat-sub{font-size:11px;color:var(--testo3);margin-top:2px;}
+
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr;}}
+
+/* PROGRESS */
+.prog-wrap{background:#eef0f3;border-radius:20px;height:8px;overflow:hidden;flex:1;}
+.prog-fill{height:100%;border-radius:20px;background:var(--verde);transition:width 0.4s ease;}
+.prog-fill.warn{background:var(--arancio);}
+.prog-fill.danger{background:var(--rosso);}
+
+/* ── VOLONTARI PER SEZIONE ── */
+/* ── ACCORDION SEZIONI ── */
+.accordion-sez{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;}
+.accordion-sez-header{display:flex;align-items:center;gap:12px;padding:14px 20px;cursor:pointer;user-select:none;transition:background 0.15s;}
+.accordion-sez-header:hover{background:#fafbfc;}
+.accordion-arrow{font-size:12px;color:var(--testo3);transition:transform 0.2s;flex-shrink:0;}
+.accordion-arrow.open{transform:rotate(0deg);}
+.accordion-arrow.closed{transform:rotate(-90deg);}
+.accordion-sez-nome{font-size:15px;font-weight:800;color:var(--testo);flex:1;}
+.accordion-sez-count{font-size:13px;font-weight:600;color:var(--testo3);}
+.accordion-sez-body{border-top:1px solid var(--border);display:none;}
+.accordion-sez-body.open{display:block;}
+
+/* SEZIONE TABS */
+.sez-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg);}
+.sez-tab{padding:10px 20px;font-size:12px;font-weight:700;color:var(--testo3);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;}
+.sez-tab:hover{color:var(--testo);}
+.sez-tab.active{color:var(--verde);border-bottom-color:var(--verde);background:var(--surface);}
+
+/* LISTA VOLONTARI ACCORDION */
+.vol-list-item{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+.vol-list-item:last-child{border-bottom:none;}
+.vol-list-item:hover{background:#fafbfc;}
+.vli-nome{font-size:14px;font-weight:700;color:var(--testo);}
+.vli-meta{font-size:12px;color:var(--testo3);margin-top:2px;}
+.vli-tel{font-size:12px;color:var(--testo2);margin-top:2px;}
+.vli-actions{display:flex;gap:4px;flex-shrink:0;margin-left:16px;}
+
+/* LISTA MEZZI ACCORDION */
+.mezzo-list-item{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+.mezzo-list-item:last-child{border-bottom:none;}
+.mezzo-list-item:hover{background:#fafbfc;}
+.mli-targa{font-size:14px;font-weight:700;color:var(--blu);font-family:'Geist Mono',monospace;}
+.mli-desc{font-size:12px;color:var(--testo2);margin-top:2px;}
+.mli-turni{font-size:12px;color:var(--testo3);margin-top:2px;}
+
+/* ── GESTIONE TURNI ── */
+.turno-selector{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
+.turno-btn{height:36px;padding:0 16px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);font-family:'Geist',sans-serif;font-size:12px;font-weight:700;color:var(--testo2);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.turno-btn:hover{border-color:var(--verde);color:var(--verde);}
+.turno-btn.active{background:var(--verde);border-color:var(--verde);color:#fff;}
+
+/* STATS TURNO */
+.turno-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:20px;}
+@media(max-width:900px){.turno-stats{grid-template-columns:repeat(4,1fr);}}
+.ts-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;text-align:center;}
+.ts-num{font-family:'Geist',sans-serif;font-size:26px;font-weight:800;line-height:1;}
+.ts-label{font-size:11px;font-weight:600;color:var(--testo3);margin-top:2px;}
+.ts-num.verde{color:var(--verde);} .ts-num.blu{color:var(--blu);} .ts-num.arancio{color:var(--arancio);} .ts-num.rosso{color:var(--rosso);}
+
+/* BOX EXTRA */
+.extra-box{background:#fffbf0;border:1.5px solid #f5d9a0;border-radius:var(--r);padding:16px 20px;margin-bottom:20px;}
+.extra-box-title{font-size:13px;font-weight:700;color:var(--arancio);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.extra-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.extra-chip{background:#fff;border:1.5px solid #f5c070;border-radius:6px;padding:8px 12px;cursor:grab;transition:box-shadow 0.15s;}
+.extra-chip:active{cursor:grabbing;opacity:0.7;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+.extra-chip:hover{box-shadow:0 2px 8px rgba(230,126,0,0.2);}
+.ec-nome{font-size:12px;font-weight:700;color:var(--testo);}
+.ec-sez{font-size:11px;color:var(--testo3);margin-top:1px;}
+.ec-tel{font-size:11px;color:var(--testo2);margin-top:1px;}
+.ec-badge{display:inline-block;background:var(--arancio);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;margin-top:4px;letter-spacing:0.5px;}
+
+/* TABELLA VARCHI */
+.varchi-table-wrap{overflow-x:auto;}
+.varchi-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);}
+.varchi-table thead th{background:var(--bg);padding:10px 14px;font-size:11px;font-weight:700;color:var(--testo3);text-transform:uppercase;letter-spacing:0.8px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;}
+.varchi-table tbody td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.varchi-table tbody tr:last-child td{border-bottom:none;}
+.varchi-table tbody tr:hover td{background:#fafbfc;}
+.td-varco{width:50px;font-family:'Geist Mono',monospace;font-size:14px;font-weight:700;color:var(--testo);}
+.td-sezione{width:140px;font-size:13px;font-weight:600;color:var(--testo2);}
+.td-volontari{min-width:280px;}
+.td-mezzo{min-width:180px;}
+.td-stato{width:100px;text-align:center;}
+
+/* CHIP VOLONTARIO in tabella */
+.vol-chip-table{display:inline-flex;flex-direction:column;background:var(--verde-light);border:1px solid #b4ddbf;border-radius:6px;padding:7px 10px;margin:3px;min-width:130px;cursor:grab;position:relative;transition:box-shadow 0.15s;}
+.vol-chip-table:hover{box-shadow:0 2px 8px rgba(26,110,46,0.15);}
+.vol-chip-table:active{cursor:grabbing;opacity:0.7;}
+.vol-chip-table.extra{background:var(--arancio-light);border-color:#f5d9a0;}
+.vc-nome{font-size:12px;font-weight:700;color:var(--testo);}
+.vc-sez{font-size:11px;color:var(--testo3);margin-top:1px;}
+.vc-tel{font-size:11px;color:var(--testo2);margin-top:1px;font-family:'Geist Mono',monospace;}
+.vc-badge-extra{display:inline-block;background:var(--arancio);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;margin-top:4px;letter-spacing:0.5px;align-self:flex-start;}
+.vc-remove{position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;color:var(--testo3);font-size:12px;opacity:0;transition:opacity 0.15s;line-height:1;padding:2px;}
+.vol-chip-table:hover .vc-remove{opacity:1;}
+.vc-remove:hover{color:var(--rosso);}
+
+/* CHIP MEZZO in tabella */
+.mezzo-chip{display:flex;flex-direction:column;background:var(--blu-light);border:1px solid #c0d4f5;border-radius:6px;padding:7px 10px;cursor:grab;position:relative;transition:box-shadow 0.15s;}
+.mezzo-chip:hover{box-shadow:0 2px 8px rgba(9,105,218,0.15);}
+.mezzo-chip:active{cursor:grabbing;opacity:0.7;}
+.mc-targa{font-size:12px;font-weight:700;color:var(--blu);font-family:'Geist Mono',monospace;}
+.mc-desc{font-size:11px;color:var(--testo2);margin-top:2px;}
+.mc-tipo{font-size:10px;color:var(--testo3);margin-top:1px;text-transform:uppercase;letter-spacing:0.3px;}
+.mc-remove{position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;color:var(--testo3);font-size:12px;opacity:0;transition:opacity 0.15s;line-height:1;padding:2px;}
+.mezzo-chip:hover .mc-remove{opacity:1;}
+.mc-remove:hover{color:var(--rosso);}
+
+/* STATO BADGE */
+.stato-completo{background:#e6f4ea;color:#1a6e2e;border:1px solid #b4ddbf;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:0.3px;}
+.stato-parziale{background:#fff4e0;color:#9a6600;border:1px solid #f5d9a0;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;}
+.stato-scoperto{background:#fff0f0;color:#cf222e;border:1px solid #ffc9c9;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;}
+.stato-surplus{background:#e8f0fe;color:#0969da;border:1px solid #c0d4f5;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;}
+
+/* SLOT VUOTO / ADD */
+.slot-drop-zone{border:1.5px dashed var(--border);border-radius:6px;padding:8px 12px;color:var(--testo3);font-size:12px;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:4px;margin:3px;}
+.slot-drop-zone:hover{border-color:var(--verde);color:var(--verde);background:var(--verde-light);}
+.slot-drop-target{border:2px dashed var(--verde)!important;background:var(--verde-light)!important;}
+.nessun-mezzo{font-size:11px;color:var(--rosso);font-style:italic;cursor:pointer;}
+.nessun-mezzo:hover{text-decoration:underline;}
+
+
+/* ── INSERIMENTO VOLONTARI ── */
+.turno-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden;}
+.turno-block-header{background:var(--verde-light);border-bottom:1px solid #b4ddbf;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}
+.turno-block-title{font-family:'Geist',sans-serif;font-size:18px;font-weight:800;color:var(--verde);}
+.turno-block-sub{font-size:12px;color:var(--verde);opacity:0.7;}
+.turno-block-body{padding:20px;}
+.vol-entry{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;position:relative;}
+.vol-entry-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.vol-entry-num{font-size:13px;font-weight:700;color:var(--testo2);}
+.vol-entry-remove{background:none;border:none;cursor:pointer;color:var(--rosso);font-size:18px;line-height:1;padding:0 4px;opacity:0.6;}
+.vol-entry-remove:hover{opacity:1;}
+.vol-fields{display:grid;grid-template-columns:2fr 1.5fr 1fr;gap:12px;align-items:end;}
+@media(max-width:700px){.vol-fields{grid-template-columns:1fr;}}
+.vol-fields .field-group{margin-bottom:0;}
+.nonpc-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--testo2);}
+.nonpc-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--verde);cursor:pointer;}
+.add-vol-btn{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--verde);cursor:pointer;padding:8px 12px;border-radius:var(--r);border:1.5px dashed var(--verde-mid);background:none;width:100%;transition:all 0.15s;margin-top:4px;}
+.add-vol-btn:hover{background:var(--verde-light);}
+.jolly-notice{display:inline-flex;align-items:center;gap:4px;background:var(--arancio-light);border:1px solid #f5d9a0;color:var(--arancio);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;margin-left:10px;}
+
+/* MONO */
+.mono{font-family:'Geist Mono',monospace;font-size:12px;}
+
+/* ── AI CHAT FLOTTANTE ─────────────────────────────────────── */
+#ai-fab{position:fixed;bottom:24px;right:24px;z-index:9999;
+  width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a6e2e,#2d8a45);
+  border:none;cursor:pointer;box-shadow:0 4px 20px rgba(26,110,46,0.4);
+  display:none;align-items:center;justify-content:center;font-size:24px;
+  transition:transform 0.2s,box-shadow 0.2s;}
+#ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(26,110,46,0.5);}
+#ai-fab.pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid rgba(26,110,46,0.4);animation:pulsering 1.5s ease-out infinite;}
+@keyframes pulsering{0%{transform:scale(1);opacity:1;}100%{transform:scale(1.5);opacity:0;}}
+
+#ai-panel{position:fixed;bottom:90px;right:24px;z-index:9998;
+  width:420px;max-width:calc(100vw - 32px);height:560px;max-height:calc(100vh - 120px);
+  background:#fff;border-radius:16px;box-shadow:0 8px 48px rgba(0,0,0,0.18);
+  display:none;flex-direction:column;overflow:hidden;
+  animation:slideUpChat 0.25s ease;}
+@keyframes slideUpChat{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+#ai-panel-header{background:linear-gradient(135deg,#1a6e2e,#2d8a45);padding:14px 18px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.ai-header-left{display:flex;align-items:center;gap:10px;}
+.ai-avatar{width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:16px;}
+.ai-header-title{color:#fff;font-weight:700;font-size:14px;}
+.ai-header-sub{color:rgba(255,255,255,0.7);font-size:11px;margin-top:1px;}
+#ai-close{background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;
+  font-size:18px;padding:4px;line-height:1;}
+#ai-close:hover{color:#fff;}
+
+#ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.ai-msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;}
+.ai-msg.user{background:#1a6e2e;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.ai-msg.assistant{background:#f6f8fa;color:var(--testo);align-self:flex-start;border-bottom-left-radius:4px;border:1px solid var(--border);}
+.ai-msg.thinking{background:#f6f8fa;color:var(--testo3);align-self:flex-start;font-style:italic;border:1px solid var(--border);}
+.ai-msg pre{background:#e8ecef;border-radius:6px;padding:8px;font-size:11px;overflow-x:auto;margin:6px 0 0;}
+
+#ai-input-wrap{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+#ai-input{flex:1;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;
+  font-family:'Geist',sans-serif;font-size:13px;resize:none;height:38px;max-height:100px;
+  transition:border-color 0.15s;line-height:1.5;overflow-y:auto;}
+#ai-input:focus{outline:none;border-color:var(--verde);}
+#ai-send{width:38px;height:38px;background:#1a6e2e;border:none;border-radius:10px;
+  cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;transition:background 0.15s;}
+#ai-send:hover{background:#155925;}
+#ai-send:disabled{opacity:0.5;cursor:not-allowed;}
+
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px;}
+.ai-sug-btn{background:#f0f7f2;border:1px solid #b4ddbf;color:#1a6e2e;border-radius:20px;
+  padding:5px 12px;font-size:11px;cursor:pointer;transition:background 0.15s;font-family:'Geist',sans-serif;}
+.ai-sug-btn:hover{background:#d4edda;}
+
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE MOBILE
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* Fix overflow globale */
+  body, html { overflow-x:hidden; width:100%; }
+  * { box-sizing:border-box; }
+
+  /* TOPBAR — due righe su mobile */
+  .topbar {
+    height:auto; padding:8px 12px;
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:4px;
+    position:sticky;top:0;z-index:100;
+  }
+  .topbar-left { min-width:0; overflow:hidden; }
+  .topbar-brand { font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar-gif { width:32px; height:32px; flex-shrink:0; }
+  .topbar-logo-jpg { display:none; }
+  .topbar-right { justify-content:flex-end; gap:8px; }
+  .topbar-user .name { font-size:12px; }
+  .topbar-user .role { display:none; }
+  .btn-logout { font-size:11px; height:30px; padding:0 10px; }
+
+  /* NAVBAR */
+  .navbar { padding:0 4px; gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch; scroll-snap-type:x mandatory; }
+  .nav-tab { font-size:11px; padding:0 10px; height:36px; white-space:nowrap; flex-shrink:0; scroll-snap-align:start; }
+
+  /* CONTENT */
+  .content { padding:12px 10px; }
+  .page-header { margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+  .page-title { font-size:16px; }
+
+  /* PANEL */
+  .panel-header { padding:10px 12px; flex-wrap:wrap; gap:8px; }
+  .panel-body { padding:12px; }
+  .panel-title { font-size:13px; }
+
+  /* DASHBOARD — testo turno compatto su mobile */
+  #dash-turni-prog > div > div:first-child {
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:4px !important;
+  }
+  #dash-turni-prog span[style*="font-size:15px"] { font-size:13px !important; }
+  #dash-turni-prog span[style*="font-size:13px"] { font-size:11px !important; }
+  #dash-turni-prog span[style*="font-size:12px"] { font-size:10px !important; }
+
+  /* TURNI SELECTOR */
+  #turni-selector { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; }
+  .turno-btn { font-size:11px; padding:0 10px; height:32px; flex-shrink:0; }
+
+  /* STATS TURNO */
+  .turno-stats { grid-template-columns:repeat(4,1fr) !important; gap:4px; }
+  .ts-num { font-size:14px; }
+  .ts-label { font-size:9px; }
+  .ts-card { padding:6px 4px; }
+
+  /* TABELLA VARCHI */
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table { min-width:580px; font-size:12px; }
+  .td-volontari { min-width:180px; }
+  .td-mezzo { min-width:130px; }
+  .vol-chip-table { min-width:100px; font-size:10px; padding:4px 6px; }
+  .vc-nome { font-size:10px; }
+  .vc-sez, .vc-tel { font-size:9px; }
+
+  /* ACCORDION SEZIONI */
+  .accordion-sez-nome { font-size:13px; }
+  .accordion-sez-count { font-size:11px; }
+  .vli-nome { font-size:13px; }
+  .vli-meta, .vli-tel { font-size:11px; }
+  .vol-list-item { padding:8px 12px; }
+
+  /* FORM */
+  .vol-fields { grid-template-columns:1fr !important; }
+  .field-group { margin-bottom:10px; }
+
+  /* MODALI */
+  .modal { width:96vw !important; max-width:96vw !important; }
+  .modal-body { padding:12px; }
+  .modal-footer { padding:10px 12px; flex-wrap:wrap; gap:8px; }
+
+  /* LOGIN */
+  .login-card { padding:20px 16px; width:92vw; }
+  .login-pretitle { font-size:22px; }
+  .login-logo { width:80px; height:80px; }
+  .login-subtitle { font-size:13px; margin-bottom:20px; }
+
+  /* PULSANTI */
+  .btn { font-size:12px; height:36px; padding:0 12px; }
+  .btn-sm { height:28px; font-size:11px; padding:0 8px; }
+
+  /* AI CHAT — a tutto schermo su mobile */
+  #ai-panel {
+    position:fixed;
+    left:0; right:0; bottom:0; top:0;
+    width:100vw !important;
+    height:100vh !important;
+    max-height:100vh !important;
+    border-radius:0;
+    z-index:10000;
+  }
+  #ai-fab { bottom:16px; right:16px; width:48px; height:48px; }
+  #ai-input-wrap { padding:10px; padding-bottom:env(safe-area-inset-bottom, 10px); }
+  #ai-input { font-size:16px; } /* evita zoom su iOS */
+  #ai-send { width:40px; height:40px; flex-shrink:0; }
+
+  /* UTILITY textarea */
+  .panel-body textarea { min-height:100px; font-size:14px; }
+
+  /* INSERIMENTO MEZZI checkbox */
+  .turni-check-grid { grid-template-columns:1fr 1fr !important; }
+
+  /* IMPORT EXCEL panel */
+  .panel-body[style*="display:flex"] { flex-direction:column; align-items:stretch !important; }
+}
+
+@media (max-width: 400px) {
+  .turno-stats { grid-template-columns:repeat(3,1fr) !important; }
+  .topbar-brand { font-size:12px; }
+  .nav-tab { font-size:10px; padding:0 8px; }
+  .content { padding:8px; }
+}
+
+</style>
 </head>
 <body>
 
@@ -418,8 +1378,1749 @@
   </div>
 </div>
 
-<script src="script.js"></script>
+<script>
+// ── SUPABASE ──────────────────────────────────────────────────
+const SUPA_URL = 'https://hnntyognhrdfhcwtmywp.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhubnR5b2duaHJkZmhjd3RteXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NDYzNTAsImV4cCI6MjA4ODMyMjM1MH0.k6c29OskhaVUiK_rbbnoOKqDqjlwXiKL5UTouSr_L94';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
+let CU = null;
+let _turni = [], _varchi = [], _volontari = [], _mezzi = [];
+let _assCtx = {}; // contesto modale assegna
+
+
+
+function togglePw() {
+  const inp = document.getElementById('login-pass');
+  const btn = document.getElementById('pw-toggle');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁'; }
+}
+
+// ── NAVBAR DINAMICA ───────────────────────────────────────────
+function buildNavbar() {
+  const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+  const navbar = document.getElementById('navbar-full');
+
+  const tabsFull = [
+    { id:'dashboard',   label:'Dashboard' },
+    { id:'sezioni',     label:'Volontari per Sezione' },
+    { id:'griglia',     label:'Gestione Turni' },
+    { id:'inserimento', label:'Inserimento Volontari' },
+    { id:'mezzi',       label:'Inserimento Mezzi' },
+    { id:'utility',     label:'Utility' },
+  ];
+
+  const tabsSez = [
+    { id:'inserimento', label:'Inserimento Volontari' },
+    { id:'mezzi',       label:'Inserimento Mezzi' },
+    { id:'sezioni',     label:'I miei Volontari' },
+    { id:'utility',     label:'Utility' },
+  ];
+
+  const tabs = isFull ? tabsFull : tabsSez;
+  navbar.innerHTML = tabs.map(t =>
+    `<button class="nav-tab" data-tab="${t.id}" onclick="showTab('${t.id}')">${t.label}</button>`
+  ).join('');
+}
+
+// ── LOADING ───────────────────────────────────────────────────
+function setLoading(on) {
+  const bar = document.getElementById('loading-bar');
+  bar.style.width = on ? '70%' : '100%';
+  if (!on) setTimeout(() => { bar.style.width = '0'; }, 350);
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  if (!u || !p) { showLoginErr('Inserisci username e password'); return; }
+  btn.textContent = 'Connessione…'; btn.disabled = true;
+  setLoading(true);
+  try {
+    const { data, error } = await sb.from('UTENTI').select('*').eq('Nome Utente', u).eq('PASSWORD', p).single();
+    if (error || !data) { showLoginErr('Username o password non corretti'); return; }
+    CU = data;
+    document.getElementById('login-screen').style.display = 'none';
+    aggiornaDrawer();
+    // Mostra AI FAB solo per ACCESSO FULL
+    if (CU['TIPOLOGIA'] === 'ACCESSO FULL') {
+      document.getElementById('ai-fab').style.display = 'flex';
+    aggiornaDrawer();
+      document.getElementById('ai-fab').classList.add('pulse');
+    }
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('topbar-name').textContent = data['Nome Utente'];
+    document.getElementById('topbar-role').textContent = data['TIPOLOGIA'] === 'ACCESSO FULL' ? 'Accesso completo' : 'Sezione: ' + (data['SEZIONE'] || '—');
+    buildNavbar();
+    showTab(CU['TIPOLOGIA'] === 'ACCESSO FULL' ? 'dashboard' : 'inserimento');
+  } catch(e) { showLoginErr('Errore di connessione'); }
+  finally { btn.textContent = 'Accedi →'; btn.disabled = false; setLoading(false); }
+}
+function showLoginErr(msg) {
+  const el = document.getElementById('login-err');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+function doLogout() {
+  CU = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('ai-fab').style.display = 'none';
+  closeDrawer();
+  document.getElementById('ai-panel').style.display = 'none';
+  _aiHistory = []; _aiOpen = false;
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const tab = document.getElementById('tab-' + name);
+  if (tab) tab.style.display = '';
+  document.querySelectorAll('.nav-tab[data-tab]').forEach(t => {
+    if (t.dataset.tab === name) t.classList.add('active');
+  });
+  const renders = { dashboard: renderDashboard, sezioni: renderSezioni, griglia: renderGriglia, utenti: renderUtenti, inserimento: renderInserimento, mezzi: renderInserimentoMezzi, utility: renderUtility };
+  if (renders[name]) renders[name]();
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m =>
+  m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); })
+);
+function showFormAlert(id, msg, type = 'ok') {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.className = 'form-alert show ' + type;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── HELPER ────────────────────────────────────────────────────
+function percClass(p) { return p >= 100 ? '' : p >= 50 ? ' warn' : ' danger'; }
+function percBadge(p) { return p >= 100 ? 'badge-green' : p >= 50 ? 'badge-orange' : 'badge-red'; }
+
+// ══════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════════════════
+async function renderDashboard() {
+  setLoading(true);
+  try {
+    const [{ data: turni }, { data: varchi }, { data: volontari }] = await Promise.all([
+      sb.from('TURNI').select('*').order('Etichetta'),
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('VOLONTARI').select('*'),
+    ]);
+    _turni = turni || []; _varchi = varchi || []; _volontari = volontari || [];
+
+    const totSlot = _varchi.length * 2; // 25 varchi × 2 = 50 slot totali
+
+    let tHTML = '';
+    _turni.forEach(t => {
+      // Logica posizionale: per ogni varco, i primi 2 per id sono principali
+      let principali = 0;
+      let completi = 0, parziali = 0, scoperti = 0;
+      _varchi.forEach(v => {
+        const nelVarco = _volontari
+          .filter(x => x['TURNO'] === t['Etichetta'] && x['VARCO'] == v['VARCO'])
+          .sort((a, b) => a.id - b.id);
+        const nPrinc = Math.min(nelVarco.length, 2);
+        principali += nPrinc;
+        if (nPrinc >= 2) completi++;
+        else if (nPrinc === 1) parziali++;
+        else scoperti++;
+      });
+      const p = totSlot ? Math.round(principali / totSlot * 100) : 0;
+
+      tHTML += `
+        <div style="margin-bottom:22px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-wrap:wrap;gap:6px">
+            <div>
+              <span style="font-size:15px;font-weight:700">${t['Etichetta']}</span>
+              <span style="color:var(--testo3);font-weight:400;font-size:13px;margin-left:8px">${t['NOME TURNO']||''} · ${t['FASCIA ORARIA']||''}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:12px;color:var(--testo3)">
+                ✅ ${completi}&nbsp;&nbsp;🟡 ${parziali}&nbsp;&nbsp;🔴 ${scoperti}
+              </span>
+              <span style="font-size:13px;color:var(--testo2);font-weight:500">${principali} / ${totSlot} vol.</span>
+              <span class="badge ${percBadge(p)}" style="font-size:13px;padding:4px 12px">${p}%</span>
+            </div>
+          </div>
+          <div class="prog-wrap" style="height:10px;border-radius:8px">
+            <div class="prog-fill${percClass(p)}" style="width:${p}%;height:10px;border-radius:8px;transition:width 0.4s ease"></div>
+          </div>
+        </div>`;
+    });
+    document.getElementById('dash-turni-prog').innerHTML = tHTML || '<div class="empty-state"><p>Nessun turno trovato</p></div>';
+
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+
+async function renderSezioni() {
+  setLoading(true);
+  try {
+    const [{ data: varchi }, { data: volontari }, { data: mezzi }, { data: mezziTurni }, { data: turni }] = await Promise.all([
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('VOLONTARI').select('*').order('NOME_COGNOME'),
+      sb.from('MEZZI').select('*').order('TARGA'),
+      sb.from('MEZZI_TURNI').select('*'),
+      sb.from('TURNI').select('*').order('Etichetta'),
+    ]);
+    _varchi = varchi || []; _volontari = volontari || []; _turni = turni || []; _mezzi = mezzi || [];
+
+    let sezioni;
+    if (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE') {
+      sezioni = [CU['SEZIONE']].filter(Boolean);
+    } else {
+      sezioni = [...new Set((varchi||[]).map(v => v['SEZIONI']).filter(Boolean))].sort();
+    }
+
+    const container = document.getElementById('sezioni-accordion');
+    if (!sezioni.length) {
+      container.innerHTML = '<div class="empty-state"><div class="ei">🗂️</div><p>Nessuna sezione trovata.</p></div>';
+      return;
+    }
+
+    container.innerHTML = sezioni.map(sez => {
+      const volSez  = (volontari||[]).filter(v => v['SEZIONE'] === sez);
+      const mezSez  = (mezzi||[]).filter(m => m['SEZIONE'] === sez);
+      const totVol  = volSez.length;
+      const totMez  = mezSez.length;
+      const isSezOpen = CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE';
+      const sezId = sez.replace(/[^a-zA-Z0-9]/g,'_');
+
+      // Lista volontari
+      const volHTML = totVol ? volSez.map(v => {
+        const turnoLabel = v['TURNO'] ? _turni.find(t=>t['Etichetta']===v['TURNO']) : null;
+        const turnoStr = turnoLabel ? `${v['TURNO']} – ${turnoLabel['FASCIA ORARIA']||''}` : (v['TURNO']||'—');
+        return `<div class="vol-list-item">
+          <div>
+            <div class="vli-nome">${v['NOME_COGNOME']}${v['NON_PC']?' &nbsp;<span class="badge badge-orange" title="Non è di Protezione Civile">NON PC</span>':''}</div>
+            <div class="vli-meta">Turni: ${turnoStr}${v['JOLLY']?' &nbsp;<span class="badge badge-orange">EXTRA</span>':''}</div>
+            <div class="vli-tel">CF: <span style="font-family:'Geist Mono',monospace;letter-spacing:0.5px">${v['CODICE_FISCALE']||'—'}</span></div>
+            <div class="vli-tel">Telefono: ${v['TELEFONO']||'—'}</div>
+          </div>
+          <div class="vli-actions">
+            <button class="btn btn-ghost btn-sm" onclick="openEditVolontario(${v.id})">✏️ Modifica</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteVolontario(${v.id},'${v['NOME_COGNOME'].replace(/'/g,"\'")}')">✕</button>
+          </div>
+        </div>`;
+      }).join('') : '<div style="padding:20px;color:var(--testo3);font-size:13px">Nessun volontario registrato.</div>';
+
+      // Lista mezzi
+      const mezHTML = totMez ? mezSez.map(m => {
+        const turniM = (mezziTurni||[]).filter(mt=>mt['MEZZO_ID']===m.id).map(mt=>mt['TURNO']);
+        return `<div class="mezzo-list-item">
+          <div>
+            <div class="mli-targa">${m['TARGA']} – ${m['MARCA']||''} ${m['MODELLO']||''}</div>
+            <div class="mli-desc">${m['TIPOLOGIA']||''}</div>
+            <div class="mli-turni">Turni: ${turniM.length ? turniM.join(', ') : '—'}</div>
+          </div>
+          <div class="vli-actions">
+            <button class="btn btn-ghost btn-sm" onclick="showTab('mezzi');setTimeout(()=>editMezzo(${m.id}),500)">✏️ Modifica</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteMezzoFromSez(${m.id},'${m['TARGA']}')">✕</button>
+          </div>
+        </div>`;
+      }).join('') : '<div style="padding:20px;color:var(--testo3);font-size:13px">Nessun mezzo registrato.</div>';
+
+      return `<div class="accordion-sez">
+        <div class="accordion-sez-header" onclick="toggleAccordion('${sezId}')">
+          <span class="accordion-arrow ${isSezOpen?'open':'closed'}" id="arrow-${sezId}">▼</span>
+          <span class="accordion-sez-nome">${sez}</span>
+          <span class="accordion-sez-count">${totVol} volontar${totVol===1?'io':'i'} · ${totMez} mezz${totMez===1?'o':'i'}</span>
+        </div>
+        <div class="accordion-sez-body ${isSezOpen?'open':''}" id="body-${sezId}">
+          <div class="sez-tabs">
+            <div class="sez-tab active" id="tab-vol-${sezId}" onclick="switchSezTab('${sezId}','vol')">👥 Volontari (${totVol})</div>
+            <div class="sez-tab" id="tab-mez-${sezId}" onclick="switchSezTab('${sezId}','mez')">🚗 Mezzi (${totMez})</div>
+          </div>
+          <div id="panel-vol-${sezId}">${volHTML}</div>
+          <div id="panel-mez-${sezId}" style="display:none">${mezHTML}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function toggleAccordion(sezId) {
+  const body  = document.getElementById('body-' + sezId);
+  const arrow = document.getElementById('arrow-' + sezId);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('open', !isOpen);
+  arrow.classList.toggle('closed', isOpen);
+}
+
+function switchSezTab(sezId, tab) {
+  document.getElementById('panel-vol-' + sezId).style.display = tab === 'vol' ? '' : 'none';
+  document.getElementById('panel-mez-' + sezId).style.display = tab === 'mez' ? '' : 'none';
+  document.getElementById('tab-vol-' + sezId).className = 'sez-tab' + (tab==='vol'?' active':'');
+  document.getElementById('tab-mez-' + sezId).className = 'sez-tab' + (tab==='mez'?' active':'');
+}
+
+async function deleteVolontario(id, nome) {
+  if (!confirm(`Eliminare il volontario "${nome}"?`)) return;
+  setLoading(true);
+  try {
+    await sb.from('VOLONTARI').delete().eq('id', id);
+    await renderSezioni();
+  } catch(e) { alert('Errore: ' + e.message); }
+  finally { setLoading(false); }
+}
+
+async function deleteMezzoFromSez(id, targa) {
+  if (!confirm(`Eliminare il mezzo "${targa}"?`)) return;
+  setLoading(true);
+  try {
+    await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', id);
+    await sb.from('MEZZI').delete().eq('id', id);
+    await renderSezioni();
+  } catch(e) { alert('Errore: ' + e.message); }
+  finally { setLoading(false); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  GESTIONE TURNI
+// ══════════════════════════════════════════════════════════════
+let _turnoAttivo = null;
+let _dragData = null;
+let _mezziTurni = [];
+
+async function renderGriglia() {
+  setLoading(true);
+  try {
+    const [{ data: turni }, { data: varchi }, { data: volontari }, { data: mezziTurni }, { data: mezzi }] = await Promise.all([
+      sb.from('TURNI').select('*').order('Etichetta'),
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('VOLONTARI').select('*'),
+      sb.from('MEZZI_TURNI').select('*, MEZZI(*)'),
+      sb.from('MEZZI').select('*'),
+    ]);
+    _turni = turni || []; _varchi = varchi || [];
+    _volontari = volontari || []; _mezzi = mezzi || [];
+    _mezziTurni = mezziTurni || [];
+
+    // Selettore turni
+    if (!_turnoAttivo && _turni.length) _turnoAttivo = _turni[0]['Etichetta'];
+    document.getElementById('turno-selector').innerHTML = _turni.map(t =>
+      `<button class="turno-btn${_turnoAttivo === t['Etichetta'] ? ' active' : ''}"
+        onclick="cambioTurno('${t['Etichetta']}')">
+        ${t['Etichetta']}
+        <span style="font-size:10px;opacity:0.75;display:block">${(t['FASCIA ORARIA']||'').replace(' - ',' –')}</span>
+      </button>`
+    ).join('');
+
+    renderTurnoAttivo();
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function cambioTurno(et) {
+  _turnoAttivo = et;
+  document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  renderTurnoAttivo();
+}
+
+function renderTurnoAttivo() {
+  const turno = _turnoAttivo;
+  const volTurno   = _volontari.filter(v => v['TURNO'] === turno);
+  const mezziTurno = _mezziTurni.filter(mt => mt['TURNO'] === turno);
+
+  // Logica extra basata sulla POSIZIONE nel varco (non sul flag JOLLY nel DB):
+  // i primi 2 volontari per varco = principali, dal 3° in poi = extra
+  // Usiamo id di inserimento (id crescente) come ordine
+  function splitVarco(varcoNum) {
+    const tutti = volTurno.filter(x => x['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
+    return { principali: tutti.slice(0, 2), extra: tutti.slice(2) };
+  }
+
+  let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totExtra=0;
+  _varchi.forEach(v => {
+    const { principali, extra } = splitVarco(v['VARCO']);
+    if (principali.length >= 2) completi++;
+    else if (principali.length === 1) parziali++;
+    else scoperti++;
+    if (extra.length > 0) surplus++;
+    totPrinc += principali.length;  // solo i primi 2 per varco
+    totExtra += extra.length;       // dal 3° in poi
+  });
+  const totSlot = _varchi.length * 2;
+  const pCop = totSlot ? Math.round(totPrinc / totSlot * 100) : 0;
+
+  document.getElementById('turno-stats').innerHTML = `
+    <div class="ts-card"><div class="ts-num">${_varchi.length}</div><div class="ts-label">Tot. Varchi</div></div>
+    <div class="ts-card"><div class="ts-num blu">${totPrinc} / ${totSlot}</div><div class="ts-label">Slot coperti</div></div>
+    <div class="ts-card"><div class="ts-num blu">${mezziTurno.length}</div><div class="ts-label">Mezzi</div></div>
+    <div class="ts-card"><div class="ts-num verde">${completi}</div><div class="ts-label">Completi</div></div>
+    <div class="ts-card"><div class="ts-num arancio">${parziali}</div><div class="ts-label">Parziali</div></div>
+    <div class="ts-card"><div class="ts-num rosso">${scoperti}</div><div class="ts-label">Scoperti</div></div>
+    <div class="ts-card"><div class="ts-num arancio">${totExtra}</div><div class="ts-label">Extra</div></div>
+  `;
+
+  const tbody = document.getElementById('varchi-tbody');
+  tbody.innerHTML = _varchi.map(v => {
+    const { principali, extra } = splitVarco(v['VARCO']);
+    const mezzoSlot = mezziTurno.find(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == v['VARCO']);
+
+    let statoHtml;
+    if (extra.length > 0 && principali.length >= 2)
+      statoHtml = `<span class="stato-surplus">SURPLUS</span>`;
+    else if (principali.length >= 2)
+      statoHtml = `<span class="stato-completo">COMPLETO</span>`;
+    else if (principali.length === 1)
+      statoHtml = `<span class="stato-parziale">PARZIALE</span>`;
+    else
+      statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
+
+    const chipsP = principali.map(vol => `
+      <div class="vol-chip-table" draggable="true" ondragstart="dragStart(event,'vol',${vol.id})">
+        <div class="vc-nome">${vol['NOME_COGNOME']}</div>
+        <div class="vc-sez">Sez: ${vol['SEZIONE'] || '—'}</div>
+        <div class="vc-tel">${vol['TELEFONO'] || ''}</div>
+        <button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>
+      </div>`).join('');
+
+    const chipsE = extra.map(vol => `
+      <div class="vol-chip-table extra" draggable="true" ondragstart="dragStart(event,'vol',${vol.id})">
+        <div class="vc-nome">${vol['NOME_COGNOME']}</div>
+        <div class="vc-sez">Sez: ${vol['SEZIONE'] || '—'}</div>
+        <div class="vc-tel">${vol['TELEFONO'] || ''}</div>
+        <div class="vc-badge-extra">EXTRA</div>
+        <button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>
+      </div>`).join('');
+
+    const slotVuoto = principali.length < 2
+      ? `<div class="slot-drop-zone"
+           ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"
+           onclick="openAssegnaVol(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">
+           + Trascina volontario qui
+         </div>` : '';
+
+    const mezzoHtml = mezzoSlot
+      ? `<div class="mezzo-chip" draggable="true" ondragstart="dragStart(event,'mezzo',${mezzoSlot.id})">
+          <div class="mc-targa">${mezzoSlot['MEZZI']['TARGA']} – ${mezzoSlot['MEZZI']['MARCA']||''} ${mezzoSlot['MEZZI']['MODELLO']||''}</div>
+          <div class="mc-tipo">${mezzoSlot['MEZZI']['TIPOLOGIA']||''}</div>
+          <button class="mc-remove" onclick="rimuoviMezzo(${mezzoSlot.id})" title="Rimuovi">✕</button>
+        </div>`
+      : `<span class="nessun-mezzo" onclick="openAssegnaMezzo(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">+ NESSUN MEZZO</span>`;
+
+    return `<tr>
+      <td class="td-varco">${v['VARCO']}</td>
+      <td class="td-sezione">${v['SEZIONI'] || '—'}</td>
+      <td class="td-volontari"
+        ondragover="dragOver(event)"
+        ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')"
+        ondragleave="dragLeave(event)">
+        <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">
+          ${chipsP}${chipsE}${slotVuoto}
+        </div>
+      </td>
+      <td class="td-mezzo">${mezzoHtml}</td>
+      <td class="td-stato">${statoHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────
+function dragStart(e, tipo, id) {
+  _dragData = { tipo, id };
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.5';
+  setTimeout(() => { if(e.currentTarget) e.currentTarget.style.opacity = ''; }, 0);
+}
+function dragOver(e) {
+  e.preventDefault();
+  const td = e.currentTarget.closest('td');
+  if (td) td.classList.add('slot-drop-target');
+}
+function dragLeave(e) {
+  const td = e.currentTarget.closest('td');
+  if (td) td.classList.remove('slot-drop-target');
+}
+async function dropOnVarco(e, varco, turno) {
+  e.preventDefault();
+  const td = e.currentTarget.closest ? e.currentTarget.closest('td') : e.currentTarget;
+  if (td) td.classList.remove('slot-drop-target');
+  if (!_dragData) return;
+  setLoading(true);
+  try {
+    if (_dragData.tipo === 'vol') {
+      // Conta quanti volontari ci sono già in questo varco+turno (escluso il volontario che stiamo spostando)
+      const giàPresenti = _volontari.filter(v =>
+        v['TURNO'] === turno && v['VARCO'] == varco && v.id !== _dragData.id
+      ).length;
+      // Se ci sono già 2 o più → il volontario spostato sarà EXTRA (JOLLY=true)
+      // Se ce ne sono meno di 2 → sarà principale (JOLLY=false)
+      const saràJolly = giàPresenti >= 2;
+      await sb.from('VOLONTARI').update({
+        VARCO: varco,
+        TURNO: turno,
+        JOLLY: saràJolly
+      }).eq('id', _dragData.id);
+    } else if (_dragData.tipo === 'mezzo') {
+      const mt = _mezziTurni.find(m => m.id === _dragData.id);
+      if (mt) await sb.from('MEZZI').update({ VARCO: varco }).eq('id', mt['MEZZO_ID']);
+    }
+    _dragData = null;
+    await renderGriglia();
+  } catch(err) { console.error(err); alert('Errore: ' + err.message); }
+  finally { setLoading(false); }
+}
+
+// ── ASSEGNA VOLONTARIO ────────────────────────────────────────
+async function openAssegnaVol(varco, turno, sezVarco) {
+  _assCtx = { varco, turno };
+  document.getElementById('modal-assegna-title').textContent = `Assegna Volontario – Varco ${varco}`;
+  document.getElementById('assegna-info').innerHTML =
+    `<strong>Varco:</strong> ${varco} &nbsp;·&nbsp; <strong>Turno:</strong> ${turno}<br><strong>Sezione:</strong> ${sezVarco || '—'}`;
+  // Mostra volontari dello stesso turno che non hanno varco assegnato
+  const disp = _volontari.filter(v => v['TURNO'] === turno && (!v['VARCO'] || v['JOLLY']));
+  document.getElementById('assegna-sel').innerHTML = disp.length
+    ? disp.map(v => `<option value="${v.id}">${v['NOME_COGNOME']} · ${v['SEZIONE'] || '—'}</option>`).join('')
+    : '<option value="">— Nessun volontario disponibile —</option>';
+  openModal('modal-assegna');
+}
+
+async function doAssegna() {
+  const id = document.getElementById('assegna-sel').value;
+  if (!id) { showFormAlert('assegna-alert', 'Seleziona un volontario', 'err'); return; }
+  setLoading(true);
+  try {
+    // Conta quanti ci sono già nel varco destinazione
+    const giàPresenti = _volontari.filter(v =>
+      v['TURNO'] === _assCtx.turno && v['VARCO'] == _assCtx.varco && v.id !== parseInt(id)
+    ).length;
+    const saràJolly = giàPresenti >= 2;
+    await sb.from('VOLONTARI').update({ VARCO: _assCtx.varco, JOLLY: saràJolly }).eq('id', id);
+    closeModal('modal-assegna');
+    await renderGriglia();
+  } catch(e) { showFormAlert('assegna-alert', 'Errore: ' + e.message, 'err'); }
+  finally { setLoading(false); }
+}
+
+async function rimuoviVol(id) {
+  if (!confirm('Rimuovere il volontario da questo varco?')) return;
+  setLoading(true);
+  try {
+    // Togli il varco — il volontario sparisce dalla griglia ma rimane nel DB
+    await sb.from('VOLONTARI').update({ VARCO: null, JOLLY: true }).eq('id', id);
+    await renderGriglia();
+  } catch(e) { alert('Errore: ' + e.message); }
+  finally { setLoading(false); }
+}
+
+// ── ASSEGNA MEZZO ─────────────────────────────────────────────
+async function openAssegnaMezzo(varco, turno, sezVarco) {
+  _assCtx = { varco, turno };
+  document.getElementById('modal-assegna-mezzo-title').textContent = `Assegna Mezzo – Varco ${varco}`;
+  document.getElementById('assegna-mezzo-info').innerHTML =
+    `<strong>Varco:</strong> ${varco} &nbsp;·&nbsp; <strong>Turno:</strong> ${turno}<br><strong>Sezione:</strong> ${sezVarco || '—'}`;
+  const occupatiIds = _mezziTurni.filter(mt => mt['TURNO'] === turno).map(mt => mt['MEZZO_ID']);
+  const disp = _mezzi.filter(m => !occupatiIds.includes(m.id));
+  document.getElementById('assegna-mezzo-sel').innerHTML = disp.length
+    ? disp.map(m => `<option value="${m.id}">${m['TARGA']} · ${m['MARCA'] || ''} ${m['MODELLO'] || ''} · ${m['SEZIONE'] || '—'}</option>`).join('')
+    : '<option value="">— Nessun mezzo disponibile —</option>';
+  openModal('modal-assegna-mezzo');
+}
+
+async function doAssegnaMezzo() {
+  const mezzoId = document.getElementById('assegna-mezzo-sel').value;
+  if (!mezzoId) { showFormAlert('assegna-mezzo-alert', 'Seleziona un mezzo', 'err'); return; }
+  setLoading(true);
+  try {
+    await sb.from('MEZZI').update({ VARCO: _assCtx.varco }).eq('id', parseInt(mezzoId));
+    await sb.from('MEZZI_TURNI').insert({ MEZZO_ID: parseInt(mezzoId), TURNO: _assCtx.turno });
+    closeModal('modal-assegna-mezzo');
+    await renderGriglia();
+  } catch(e) { showFormAlert('assegna-mezzo-alert', 'Errore: ' + e.message, 'err'); }
+  finally { setLoading(false); }
+}
+
+async function rimuoviMezzo(mezziTurniId) {
+  if (!confirm('Rimuovere il mezzo da questo turno?')) return;
+  setLoading(true);
+  try {
+    await sb.from('MEZZI_TURNI').delete().eq('id', mezziTurniId);
+    await renderGriglia();
+  } catch(e) { alert('Errore: ' + e.message); }
+  finally { setLoading(false); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UTENTI
+// ══════════════════════════════════════════════════════════════
+async function renderUtenti() {
+  setLoading(true);
+  try {
+    const q = (document.getElementById('search-utenti')?.value || '').toLowerCase();
+    const { data: list, error } = await sb.from('UTENTI').select('*').order('Nome Utente');
+    if (error) throw error;
+    const filtered = (list || []).filter(u =>
+      !q || (u['Nome Utente']||'').toLowerCase().includes(q) || (u['SEZIONE']||'').toLowerCase().includes(q)
+    );
+    const tbody = document.getElementById('tbody-utenti');
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="ei">👤</div><p>Nessun utente trovato.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = filtered.map((u, i) => `
+      <tr>
+        <td style="color:var(--testo3);font-size:12px">${String(i+1).padStart(2,'0')}</td>
+        <td><strong>${u['Nome Utente']}</strong></td>
+        <td>${u['SEZIONE'] ? `<span class="badge badge-grey">${u['SEZIONE']}</span>` : '<span style="color:var(--testo3)">—</span>'}</td>
+        <td>${u['TIPOLOGIA'] === 'ACCESSO FULL' ? '<span class="tag-full">⭐ Accesso Full</span>' : '<span class="tag-sez">Sezionale</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-ghost" onclick="editUtente('${u.id}')">Modifica</button>
+          ${u['Nome Utente'] !== CU['Nome Utente']
+            ? `<button class="btn btn-danger" onclick="deleteUtente('${u.id}','${u['Nome Utente'].replace(/'/g,"\\'")}')">Rimuovi</button>`
+            : '<span style="font-size:11px;color:var(--testo3);margin-left:8px">(attivo)</span>'}
+        </td>
+      </tr>`).join('');
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function toggleSezione() {
+  const tipo = document.getElementById('utente-tipo').value;
+  document.getElementById('field-sezione').style.display = tipo === 'ACCESSO FULL' ? 'none' : '';
+}
+
+function openNewUtente() {
+  document.getElementById('utente-id').value = '';
+  document.getElementById('utente-user').value = '';
+  document.getElementById('utente-pass').value = '';
+  document.getElementById('utente-tipo').value = 'ACCESSO SEZIONALE';
+  document.getElementById('utente-sezione').value = '';
+  document.getElementById('utente-alert').className = 'form-alert';
+  document.getElementById('modal-utente-title').textContent = 'Aggiungi utente';
+  toggleSezione(); openModal('modal-utente');
+}
+
+async function editUtente(id) {
+  const { data: u } = await sb.from('UTENTI').select('*').eq('id', id).single();
+  if (!u) return;
+  document.getElementById('utente-id').value = u.id;
+  document.getElementById('utente-user').value = u['Nome Utente'];
+  document.getElementById('utente-pass').value = '';
+  document.getElementById('utente-tipo').value = u['TIPOLOGIA'] || 'ACCESSO SEZIONALE';
+  document.getElementById('utente-sezione').value = u['SEZIONE'] || '';
+  document.getElementById('utente-alert').className = 'form-alert';
+  document.getElementById('modal-utente-title').textContent = 'Modifica utente';
+  toggleSezione(); openModal('modal-utente');
+}
+
+async function saveUtente() {
+  const username = document.getElementById('utente-user').value.trim().toUpperCase();
+  const pass     = document.getElementById('utente-pass').value;
+  const tipo     = document.getElementById('utente-tipo').value;
+  const sezione  = document.getElementById('utente-sezione').value.trim().toUpperCase() || null;
+  const id       = document.getElementById('utente-id').value;
+  if (!username) { showFormAlert('utente-alert','Username obbligatorio','err'); return; }
+  if (!id && !pass) { showFormAlert('utente-alert','Password obbligatoria','err'); return; }
+  if (tipo === 'ACCESSO SEZIONALE' && !sezione) { showFormAlert('utente-alert','Inserisci la sezione','err'); return; }
+  const row = { 'Nome Utente': username, 'TIPOLOGIA': tipo, 'SEZIONE': tipo === 'ACCESSO FULL' ? null : sezione };
+  if (pass) row['PASSWORD'] = pass;
+  setLoading(true);
+  try {
+    if (id) { const { error } = await sb.from('UTENTI').update(row).eq('id', id); if (error) throw error; }
+    else     { const { error } = await sb.from('UTENTI').insert(row); if (error) throw error; }
+    closeModal('modal-utente'); renderUtenti();
+  } catch(e) { showFormAlert('utente-alert','Errore: '+(e.message||e),'err'); }
+  finally { setLoading(false); }
+}
+
+async function deleteUtente(id, username) {
+  if (!confirm(`Eliminare l'utente "${username}"?`)) return;
+  setLoading(true);
+  try {
+    const { error } = await sb.from('UTENTI').delete().eq('id', id);
+    if (error) throw error;
+    renderUtenti();
+  } catch(e) { alert('Errore: '+e.message); }
+  finally { setLoading(false); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INSERIMENTO VOLONTARI
+// ══════════════════════════════════════════════════════════════
+
+// Struttura dati form: { [etichettaTurno]: [ {nome, cf, tel, nonpc}, ... ] }
+let _insData = {};
+
+async function renderInserimento() {
+  setLoading(true);
+  try {
+    const sezione = CU['SEZIONE'];
+    document.getElementById('ins-sezione-label').textContent = 'Sezione: ' + (sezione || '—');
+
+    const { data: turni } = await sb.from('TURNI').select('*').order('Etichetta');
+    if (!turni || !turni.length) {
+      document.getElementById('ins-turni-container').innerHTML = '<div class="empty-state"><div class="ei">🕐</div><p>Nessun turno trovato.</p></div>';
+      return;
+    }
+
+    // Inizializza _insData se vuoto
+    turni.forEach(t => {
+      if (!_insData[t['Etichetta']]) _insData[t['Etichetta']] = [{ nome:'', cf:'', tel:'', nonpc:false }];
+    });
+
+    // Carica volontari già inseriti per questa sezione
+    const { data: esistenti } = await sb.from('VOLONTARI').select('*').eq('SEZIONE', sezione);
+    if (esistenti && esistenti.length) {
+      turni.forEach(t => {
+        const volTurno = esistenti.filter(v => v['TURNO'] === t['Etichetta']);
+        if (volTurno.length) {
+          _insData[t['Etichetta']] = volTurno.map(v => ({
+            id: v.id,
+            nome: v['NOME_COGNOME'] || '',
+            cf:   v['CODICE_FISCALE'] || '',
+            tel:  v['TELEFONO'] || '',
+            nonpc: v['NON_PC'] || false
+          }));
+          // Assicura almeno 1 riga vuota per aggiungere
+        }
+      });
+    }
+
+    renderTurniForm(turni);
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function renderTurniForm(turni) {
+  const container = document.getElementById('ins-turni-container');
+  container.innerHTML = turni.map(t => {
+    const et = t['Etichetta'];
+    const vols = _insData[et] || [{ nome:'', cf:'', tel:'', nonpc:false }];
+    return `
+      <div class="turno-block">
+        <div class="turno-block-header">
+          <div>
+            <div class="turno-block-title">${et} – ${t['NOME TURNO'] || ''}</div>
+            <div class="turno-block-sub">${t['GIORNO'] || ''} · ${t['FASCIA ORARIA'] || ''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge ${vols.length >= 2 ? 'badge-green' : 'badge-orange'}">${vols.length} volontar${vols.length === 1 ? 'io' : 'i'}</span>
+            ${vols.length > 2 ? `<span class="jolly-notice">⚡ ${vols.length - 2} jolly</span>` : ''}
+          </div>
+        </div>
+        <div class="turno-block-body">
+          <div id="vols-${et.replace(/ /g,'_')}">
+            ${vols.map((v, i) => volEntryHTML(et, i, v)).join('')}
+          </div>
+          <button class="add-vol-btn" onclick="addVolEntry('${et}')">
+            + Aggiungi volontario${vols.length >= 2 ? ' <span class="jolly-notice" style="margin-left:4px">⚡ jolly</span>' : ''}
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function volEntryHTML(turno, idx, v) {
+  const et = turno.replace(/ /g,'_');
+  const isJolly = idx >= 2;
+  return `
+    <div class="vol-entry" id="entry-${et}-${idx}">
+      <div class="vol-entry-header">
+        <span class="vol-entry-num">
+          Volontario ${idx + 1}
+          ${isJolly ? '<span class="jolly-notice">⚡ jolly</span>' : ''}
+        </span>
+        ${idx > 0 ? `<button class="vol-entry-remove" onclick="removeVolEntry('${turno}',${idx})" title="Rimuovi">✕</button>` : ''}
+      </div>
+      <div class="vol-fields">
+        <div class="field-group">
+          <label>Nome e Cognome *</label>
+          <input type="text" style="text-transform:uppercase"
+            placeholder="Es. ROSSI MARIO"
+            value="${v.nome || ''}"
+            oninput="updateVol('${turno}',${idx},'nome',this.value)">
+        </div>
+        <div class="field-group">
+          <label>Codice Fiscale</label>
+          <input type="text" style="text-transform:uppercase"
+            placeholder="Es. RSSMRA80A01H501Z"
+            value="${v.cf || ''}"
+            oninput="updateVol('${turno}',${idx},'cf',this.value)">
+        </div>
+        <div class="field-group">
+          <label>Telefono</label>
+          <input type="tel"
+            placeholder="Es. 3331234567"
+            value="${v.tel || ''}"
+            oninput="updateVol('${turno}',${idx},'tel',this.value)">
+        </div>
+      </div>
+      <div class="nonpc-row">
+        <input type="checkbox" id="nonpc-${et}-${idx}"
+          ${v.nonpc ? 'checked' : ''}
+          onchange="updateVol('${turno}',${idx},'nonpc',this.checked)">
+        <label for="nonpc-${et}-${idx}">Volontario NON di Protezione Civile</label>
+      </div>
+    </div>`;
+}
+
+function addVolEntry(turno) {
+  if (!_insData[turno]) _insData[turno] = [];
+  _insData[turno].push({ nome:'', cf:'', tel:'', nonpc:false });
+  // Re-render solo il blocco del turno
+  const et = turno.replace(/ /g,'_');
+  const container = document.getElementById('vols-' + et);
+  if (container) {
+    const vols = _insData[turno];
+    container.innerHTML = vols.map((v, i) => volEntryHTML(turno, i, v)).join('');
+    // Aggiorna badge
+    const badge = container.closest('.turno-block').querySelector('.turno-block-header .badge');
+    if (badge) {
+      badge.textContent = vols.length + ' volontar' + (vols.length === 1 ? 'io' : 'i');
+      badge.className = 'badge ' + (vols.length >= 2 ? 'badge-green' : 'badge-orange');
+    }
+  }
+}
+
+function removeVolEntry(turno, idx) {
+  if (!_insData[turno] || _insData[turno].length <= 1) return;
+  _insData[turno].splice(idx, 1);
+  const et = turno.replace(/ /g,'_');
+  const container = document.getElementById('vols-' + et);
+  if (container) container.innerHTML = _insData[turno].map((v, i) => volEntryHTML(turno, i, v)).join('');
+}
+
+function updateVol(turno, idx, field, val) {
+  if (!_insData[turno]) return;
+  if (_insData[turno][idx]) _insData[turno][idx][field] = val;
+}
+
+async function salvaVolontari() {
+  const sezione = CU['SEZIONE'];
+  if (!sezione) { showFormAlert('ins-alert', 'Account senza sezione assegnata', 'err'); return; }
+
+  // Trova il varco della sezione
+  const { data: varcoData } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).single();
+  const varcoNum = varcoData ? varcoData['VARCO'] : null;
+
+  setLoading(true);
+  try {
+    let totSalvati = 0;
+    let totJolly = 0;
+
+    for (const [turno, vols] of Object.entries(_insData)) {
+      for (let i = 0; i < vols.length; i++) {
+        const v = vols[i];
+        if (!v.nome.trim()) continue; // salta righe vuote
+
+        const isJolly = i >= 2; // dal 3° in poi è jolly
+        const varcoAssegnato = isJolly ? null : varcoNum;
+
+        const row = {
+          'NOME_COGNOME':   v.nome.trim().toUpperCase(),
+          'CODICE_FISCALE': v.cf.trim().toUpperCase() || null,
+          'TELEFONO':       v.tel.trim() || null,
+          'NON_PC':         v.nonpc || false,
+          'SEZIONE':        sezione,
+          'TURNO':          turno,
+          'VARCO':          varcoAssegnato,
+          'JOLLY':          isJolly,
+        };
+
+        if (v.id) {
+          // Aggiorna esistente
+          const { error } = await sb.from('VOLONTARI').update(row).eq('id', v.id);
+          if (error) throw error;
+        } else {
+          // Inserisci nuovo
+          const { data: ins, error } = await sb.from('VOLONTARI').insert(row).select().single();
+          if (error) throw error;
+          v.id = ins.id; // salva id per futuri update
+        }
+
+        isJolly ? totJolly++ : totSalvati++;
+      }
+    }
+
+    showFormAlert('ins-alert', `✅ Salvati ${totSalvati} volontari assegnati${totJolly ? ' + ' + totJolly + ' jolly' : ''}.`, 'ok');
+  } catch(e) {
+    showFormAlert('ins-alert', 'Errore durante il salvataggio: ' + (e.message || e), 'err');
+    console.error(e);
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  INSERIMENTO MEZZI
+// ══════════════════════════════════════════════════════════════
+const SEZIONI_LIST = ['ACQUI TERME','ALESSANDRIA','AOSTA','ASTI','BIELLA','CASALE MONFERRATO','CEVA','CUNEO','DOMODOSSOLA','GENOVA','IMPERIA','INTRA','IVREA','LA SPEZIA','MONDOVI','NOVARA','OMEGNA','PINEROLO','SALUZZO','SAVONA','TORINO','VALSESIANA','VALSUSA','VERCELLI'];
+
+async function renderInserimentoMezzi() {
+  const sezione = CU['SEZIONE'];
+  const isFull  = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+  document.getElementById('mezzi-sezione-label').textContent = 'Sezione: ' + (sezione || 'Tutte');
+
+  setLoading(true);
+  try {
+    // Carica turni e mezzi
+    const [{ data: turni }, { data: mezzi }, { data: mezziTurni }] = await Promise.all([
+      sb.from('TURNI').select('*').order('Etichetta'),
+      isFull
+        ? sb.from('MEZZI').select('*').order('TARGA')
+        : sb.from('MEZZI').select('*').eq('SEZIONE', sezione).order('TARGA'),
+      sb.from('MEZZI_TURNI').select('*'),
+    ]);
+    _turni = turni || [];
+
+    // Popola checkbox turni nel form
+    document.getElementById('mezzo-turni-checks').innerHTML = (_turni).map(t => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;transition:all 0.15s;"
+        onmouseover="this.style.borderColor='var(--verde)'" onmouseout="this.style.borderColor='var(--border)'">
+        <input type="checkbox" value="${t['Etichetta']}" name="mezzo-turno"
+          style="width:16px;height:16px;accent-color:var(--verde);cursor:pointer">
+        ${t['Etichetta']} – ${t['NOME TURNO'] || t['FASCIA ORARIA'] || ''}
+      </label>`).join('');
+
+    // Popola sezioni nel form (solo full può scegliere)
+    const selSez = document.getElementById('mezzo-sezione');
+    if (isFull) {
+      selSez.innerHTML = '<option value="">Seleziona una sezione</option>' +
+        SEZIONI_LIST.map(s => `<option value="${s}">${s}</option>`).join('');
+      document.getElementById('mezzo-sezione-wrap').style.display = '';
+    } else {
+      selSez.innerHTML = `<option value="${sezione}" selected>${sezione}</option>`;
+      document.getElementById('mezzo-sezione-wrap').style.display = 'none';
+    }
+
+    // Popola tabella mezzi
+    const tbody = document.getElementById('tbody-mezzi');
+    if (!mezzi || !mezzi.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = mezzi.map(m => {
+      const turniMezzo = (mezziTurni || []).filter(mt => mt['MEZZO_ID'] === m.id).map(mt => mt['TURNO']);
+      return `<tr>
+        <td><span class="mono" style="font-weight:700">${m['TARGA']}</span></td>
+        <td>${m['MARCA'] || '—'} ${m['MODELLO'] || ''}</td>
+        <td>${m['TIPOLOGIA'] ? `<span class="badge badge-blue">${m['TIPOLOGIA']}</span>` : '—'}</td>
+        <td><span class="badge badge-grey">${m['SEZIONE'] || '—'}</span></td>
+        <td style="font-size:12px">${turniMezzo.length ? turniMezzo.join(', ') : '<span style="color:var(--testo3)">Nessuno</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-ghost" onclick="editMezzo(${m.id})">Modifica</button>
+          <button class="btn btn-danger" onclick="deleteMezzo(${m.id},'${m['TARGA']}')">Rimuovi</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function openFormMezzo() {
+  document.getElementById('mezzo-edit-id').value = '';
+  document.getElementById('form-mezzo-title').textContent = 'Aggiungi nuovo mezzo';
+  document.getElementById('mezzo-targa').value = '';
+  document.getElementById('mezzo-marca').value = '';
+  document.getElementById('mezzo-modello').value = '';
+  document.getElementById('mezzo-tipologia').value = '';
+  document.getElementById('mezzo-alert').className = 'form-alert';
+  // Reset sezione
+  if (CU['TIPOLOGIA'] !== 'ACCESSO FULL') {
+    document.getElementById('mezzo-sezione').value = CU['SEZIONE'];
+  } else {
+    document.getElementById('mezzo-sezione').value = '';
+  }
+  // Reset checkboxes
+  document.querySelectorAll('input[name="mezzo-turno"]').forEach(cb => cb.checked = false);
+  document.getElementById('form-mezzo-wrap').style.display = '';
+  document.getElementById('form-mezzo-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function chiudiFormMezzo() {
+  document.getElementById('form-mezzo-wrap').style.display = 'none';
+}
+
+async function editMezzo(id) {
+  setLoading(true);
+  try {
+    const [{ data: m }, { data: mt }] = await Promise.all([
+      sb.from('MEZZI').select('*').eq('id', id).single(),
+      sb.from('MEZZI_TURNI').select('*').eq('MEZZO_ID', id),
+    ]);
+    if (!m) return;
+    document.getElementById('mezzo-edit-id').value = m.id;
+    document.getElementById('form-mezzo-title').textContent = `Modifica mezzo – ${m['TARGA']}`;
+    document.getElementById('mezzo-targa').value = m['TARGA'] || '';
+    document.getElementById('mezzo-marca').value = m['MARCA'] || '';
+    document.getElementById('mezzo-modello').value = m['MODELLO'] || '';
+    document.getElementById('mezzo-tipologia').value = m['TIPOLOGIA'] || '';
+    document.getElementById('mezzo-sezione').value = m['SEZIONE'] || '';
+    document.getElementById('mezzo-alert').className = 'form-alert';
+    // Setta checkboxes
+    const turniMezzo = (mt || []).map(x => x['TURNO']);
+    document.querySelectorAll('input[name="mezzo-turno"]').forEach(cb => {
+      cb.checked = turniMezzo.includes(cb.value);
+    });
+    document.getElementById('form-mezzo-wrap').style.display = '';
+    document.getElementById('form-mezzo-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+async function salvaMezzo() {
+  const id       = document.getElementById('mezzo-edit-id').value;
+  const targa    = document.getElementById('mezzo-targa').value.trim().toUpperCase();
+  const marca    = document.getElementById('mezzo-marca').value.trim().toUpperCase();
+  const modello  = document.getElementById('mezzo-modello').value.trim().toUpperCase();
+  const tipologia= document.getElementById('mezzo-tipologia').value;
+  const sezione  = document.getElementById('mezzo-sezione').value || CU['SEZIONE'];
+  const turniSel = [...document.querySelectorAll('input[name="mezzo-turno"]:checked')].map(cb => cb.value);
+
+  if (!targa)    { showFormAlert('mezzo-alert','Inserisci la targa','err'); return; }
+  if (!marca)    { showFormAlert('mezzo-alert','Inserisci la marca','err'); return; }
+  if (!modello)  { showFormAlert('mezzo-alert','Inserisci il modello','err'); return; }
+  if (!tipologia){ showFormAlert('mezzo-alert','Seleziona una tipologia','err'); return; }
+  if (!sezione)  { showFormAlert('mezzo-alert','Seleziona la sezione','err'); return; }
+  if (!turniSel.length){ showFormAlert('mezzo-alert','Seleziona almeno un turno','err'); return; }
+
+  // Trova varco della sezione
+  const { data: varcoData } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).single();
+  const varco = varcoData ? varcoData['VARCO'] : null;
+
+  const row = { TARGA: targa, MARCA: marca, MODELLO: modello, TIPOLOGIA: tipologia, SEZIONE: sezione, VARCO: varco };
+
+  setLoading(true);
+  try {
+    let mezzoId;
+    if (id) {
+      const { error } = await sb.from('MEZZI').update(row).eq('id', id);
+      if (error) throw error;
+      mezzoId = parseInt(id);
+      // Aggiorna turni: elimina vecchi e reinserisci
+      await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', mezzoId);
+    } else {
+      const { data: ins, error } = await sb.from('MEZZI').insert(row).select().single();
+      if (error) throw error;
+      mezzoId = ins.id;
+    }
+    // Inserisci associazioni turni
+    if (turniSel.length) {
+      const mtRows = turniSel.map(t => ({ MEZZO_ID: mezzoId, TURNO: t }));
+      const { error } = await sb.from('MEZZI_TURNI').insert(mtRows);
+      if (error) throw error;
+    }
+    chiudiFormMezzo();
+    showFormAlert('mezzo-alert','✅ Mezzo salvato con successo!','ok');
+    await renderInserimentoMezzi();
+  } catch(e) {
+    showFormAlert('mezzo-alert','Errore: ' + (e.message || e),'err');
+  } finally { setLoading(false); }
+}
+
+async function deleteMezzo(id, targa) {
+  if (!confirm(`Eliminare il mezzo "${targa}"? Verranno rimosse anche le associazioni ai turni.`)) return;
+  setLoading(true);
+  try {
+    await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', id);
+    await sb.from('MEZZI').delete().eq('id', id);
+    await renderInserimentoMezzi();
+  } catch(e) { alert('Errore: ' + e.message); }
+  finally { setLoading(false); }
+}
+
+
+// ── MODIFICA VOLONTARIO (da sezioni) ──────────────────────────
+async function openEditVolontario(id) {
+  const { data: v } = await sb.from('VOLONTARI').select('*').eq('id', id).single();
+  if (!v) return;
+  document.getElementById('edit-vol-id').value = v.id;
+  document.getElementById('edit-vol-nome').value = v['NOME_COGNOME'] || '';
+  document.getElementById('edit-vol-cf').value   = v['CODICE_FISCALE'] || '';
+  document.getElementById('edit-vol-tel').value   = v['TELEFONO'] || '';
+  document.getElementById('edit-vol-sezione').value = v['SEZIONE'] || '';
+  document.getElementById('edit-vol-nonpc').checked = v['NON_PC'] || false;
+  document.getElementById('edit-vol-alert').className = 'form-alert';
+  // Popola turni
+  const sel = document.getElementById('edit-vol-turno');
+  sel.innerHTML = (_turni.length ? _turni : []).map(t =>
+    `<option value="${t['Etichetta']}" ${v['TURNO']===t['Etichetta']?'selected':''}>${t['Etichetta']} – ${t['FASCIA ORARIA']||''}</option>`
+  ).join('');
+  openModal('modal-edit-vol');
+}
+
+async function saveEditVolontario() {
+  const id    = document.getElementById('edit-vol-id').value;
+  const nome  = document.getElementById('edit-vol-nome').value.trim().toUpperCase();
+  const cf    = document.getElementById('edit-vol-cf').value.trim().toUpperCase() || null;
+  const tel   = document.getElementById('edit-vol-tel').value.trim() || null;
+  const turno = document.getElementById('edit-vol-turno').value;
+  const nonpc = document.getElementById('edit-vol-nonpc').checked;
+  if (!nome) { showFormAlert('edit-vol-alert','Nome obbligatorio','err'); return; }
+  setLoading(true);
+  try {
+    const { error } = await sb.from('VOLONTARI').update({
+      NOME_COGNOME: nome, CODICE_FISCALE: cf, TELEFONO: tel, TURNO: turno, NON_PC: nonpc
+    }).eq('id', id);
+    if (error) throw error;
+    closeModal('modal-edit-vol');
+    await renderSezioni();
+  } catch(e) { showFormAlert('edit-vol-alert','Errore: '+e.message,'err'); }
+  finally { setLoading(false); }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORT EXCEL TURNO
+// ══════════════════════════════════════════════════════════════
+function scaricaExcelTurno() {
+  if (!_turnoAttivo || !_varchi.length) { alert('Seleziona prima un turno'); return; }
+
+  const turno    = _turnoAttivo;
+  const turnoObj = _turni.find(t => t['Etichetta'] === turno) || {};
+  const volTurno = _volontari.filter(v => v['TURNO'] === turno);
+  const mezziT   = _mezziTurni.filter(mt => mt['TURNO'] === turno);
+
+  // Intestazione riepilogo
+  const rows = [];
+  rows.push([`RIEPILOGO TURNO: ${turno} – ${turnoObj['NOME TURNO']||''} – ${turnoObj['FASCIA ORARIA']||''}`]);
+  rows.push([`Generato il: ${new Date().toLocaleDateString('it-IT')} alle ${new Date().toLocaleTimeString('it-IT')}`]);
+  rows.push([]);
+  rows.push(['VARCO', 'SEZIONE', 'VOL. 1 – NOME', 'VOL. 1 – CF', 'VOL. 1 – TEL', 'VOL. 1 – PC',
+             'VOL. 2 – NOME', 'VOL. 2 – CF', 'VOL. 2 – TEL', 'VOL. 2 – PC',
+             'EXTRA (3°+)', 'MEZZO – TARGA', 'MEZZO – TIPO', 'STATO']);
+
+  let completi=0, parziali=0, scoperti=0, totExtra=0;
+
+  _varchi.forEach(v => {
+    const nelVarco = volTurno
+      .filter(x => x['VARCO'] == v['VARCO'])
+      .sort((a, b) => a.id - b.id);
+
+    const principali = nelVarco.slice(0, 2);
+    const extra      = nelVarco.slice(2);
+    const mezzo      = mezziT.find(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == v['VARCO']);
+
+    const nP = principali.length;
+    let stato = nP >= 2 ? (extra.length > 0 ? 'SURPLUS' : 'COMPLETO') : nP === 1 ? 'PARZIALE' : 'SCOPERTO';
+    if (nP >= 2) completi++; else if (nP === 1) parziali++; else scoperti++;
+    totExtra += extra.length;
+
+    const v1 = principali[0] || {};
+    const v2 = principali[1] || {};
+    const extraNomi = extra.map(e => e['NOME_COGNOME']).join(', ') || '—';
+
+    rows.push([
+      v['VARCO'],
+      v['SEZIONI'] || '—',
+      v1['NOME_COGNOME'] || '—',
+      v1['CODICE_FISCALE'] || '—',
+      v1['TELEFONO'] || '—',
+      v1['NON_PC'] ? 'NON PC' : (v1['NOME_COGNOME'] ? 'PC' : '—'),
+      v2['NOME_COGNOME'] || '—',
+      v2['CODICE_FISCALE'] || '—',
+      v2['TELEFONO'] || '—',
+      v2['NON_PC'] ? 'NON PC' : (v2['NOME_COGNOME'] ? 'PC' : '—'),
+      extraNomi,
+      mezzo ? mezzo['MEZZI']['TARGA'] : '—',
+      mezzo ? (mezzo['MEZZI']['TIPOLOGIA'] || '—') : '—',
+      stato
+    ]);
+  });
+
+  // Riga totali
+  rows.push([]);
+  rows.push(['RIEPILOGO', '', `Slot coperti: ${Math.min(completi*2+parziali, _varchi.length*2)} / ${_varchi.length*2}`,
+             '', '', '', '', '', '', '', `Extra: ${totExtra}`, '',
+             '', `Completi: ${completi} | Parziali: ${parziali} | Scoperti: ${scoperti}`]);
+
+  // Crea workbook
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Larghezze colonne
+  ws['!cols'] = [
+    {wch:8},{wch:18},{wch:24},{wch:18},{wch:14},{wch:8},
+    {wch:24},{wch:18},{wch:14},{wch:8},
+    {wch:30},{wch:14},{wch:14},{wch:12}
+  ];
+
+  // Merge cella titolo
+  ws['!merges'] = [
+    { s:{r:0,c:0}, e:{r:0,c:13} },
+    { s:{r:1,c:0}, e:{r:1,c:13} },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, turno);
+  XLSX.writeFile(wb, `Riepilogo_${turno}_${turnoObj['NOME TURNO']||''}.xlsx`.replace(/\s+/g,'_'));
+}
+
+
+
+
+// ══════════════════════════════════════════════════════════════
+//  DRAWER MOBILE
+// ══════════════════════════════════════════════════════════════
+let _drawerOpen = false;
+
+function toggleDrawer() {
+  _drawerOpen = !_drawerOpen;
+  document.getElementById('drawer').classList.toggle('open', _drawerOpen);
+  document.getElementById('drawer-overlay').style.display = _drawerOpen ? 'block' : 'none';
+  setTimeout(() => {
+    document.getElementById('drawer-overlay').classList.toggle('open', _drawerOpen);
+  }, 10);
+}
+
+function closeDrawer() {
+  _drawerOpen = false;
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('drawer-overlay').style.display = 'none';
+  }, 250);
+}
+
+function aggiornaDrawer() {
+  if (!CU) return;
+
+  // Header
+  document.getElementById('drawer-username').textContent = CU['Nome Utente'] || '—';
+  document.getElementById('drawer-userrole').textContent = CU['TIPOLOGIA'] || '—';
+
+  // GIF avatar nel drawer
+  const gifEl = document.getElementById('drawer-gif');
+  const gifSrc = document.querySelector('.topbar-gif img')?.src;
+  if (gifSrc) gifEl.innerHTML = `<img src="${gifSrc}" style="width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.4)">`;
+
+  // Tab di navigazione (stesse del navbar)
+  const navEl = document.getElementById('drawer-nav');
+  const tabs = document.querySelectorAll('.nav-tab');
+  navEl.innerHTML = '';
+  const icons = {'Dashboard':'📊','Volontari per Sezione':'👥','Gestione Turni':'📅','Inserimento Volontari':'➕','Inserimento Mezzi':'🚗','I miei Volontari':'👤','Utility':'🔧'};
+  tabs.forEach(tab => {
+    const label = tab.textContent.trim();
+    const btn = document.createElement('button');
+    btn.className = 'drawer-tab' + (tab.classList.contains('active') ? ' active' : '');
+    btn.innerHTML = `<span style="font-size:18px">${icons[label]||'•'}</span> ${label}`;
+    btn.onclick = () => {
+      tab.click();
+      closeDrawer();
+    };
+    navEl.appendChild(btn);
+  });
+}
+
+// Aggiorna drawer quando cambia tab
+function aggiornaDrawerTab() {
+  document.querySelectorAll('.drawer-tab').forEach((btn, i) => {
+    const tabs = document.querySelectorAll('.nav-tab');
+    if (tabs[i]) btn.classList.toggle('active', tabs[i].classList.contains('active'));
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AI CHAT
+// ══════════════════════════════════════════════════════════════
+let _aiOpen = false;
+let _aiHistory = [];
+let _aiThinking = false;
+
+function toggleAiChat() {
+  _aiOpen = !_aiOpen;
+  const panel = document.getElementById('ai-panel');
+  const fab   = document.getElementById('ai-fab');
+  panel.style.display = _aiOpen ? 'flex' : 'none';
+  fab.classList.toggle('pulse', !_aiOpen);
+  if (_aiOpen) {
+    document.getElementById('ai-input').focus();
+    // Carica dati freschi per il contesto
+    _aiRefreshContext();
+  }
+}
+
+function aiSuggest(testo) {
+  document.getElementById('ai-input').value = testo;
+  aiSend();
+}
+
+function aiKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); }
+}
+
+async function _aiRefreshContext() {
+  // Ricarica dati aggiornati dal DB per il contesto
+  try {
+    const [{ data: volontari }, { data: varchi }, { data: turni }, { data: mezzi }, { data: mezziTurni }] = await Promise.all([
+      sb.from('VOLONTARI').select('*'),
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('TURNI').select('*').order('Etichetta'),
+      sb.from('MEZZI').select('*'),
+      sb.from('MEZZI_TURNI').select('*, MEZZI(*)'),
+    ]);
+    _volontari   = volontari   || [];
+    _varchi      = varchi      || [];
+    _turni       = turni       || [];
+    _mezzi       = mezzi       || [];
+    _mezziTurni  = mezziTurni  || [];
+  } catch(e) { console.error('AI context refresh error:', e); }
+}
+
+function _buildAiContext() {
+  // Costruisce un riepilogo dati da passare all'AI come contesto
+  const riepTurni = _turni.map(t => {
+    let completi=0, parziali=0, scoperti=0, extra=0;
+    _varchi.forEach(v => {
+      const nelVarco = _volontari
+        .filter(x => x['TURNO'] === t['Etichetta'] && x['VARCO'] == v['VARCO'])
+        .sort((a,b) => a.id - b.id);
+      const princ = nelVarco.slice(0,2).length;
+      if (princ >= 2) completi++; else if (princ === 1) parziali++; else scoperti++;
+      extra += nelVarco.slice(2).length;
+    });
+    const volTot = _volontari.filter(v => v['TURNO'] === t['Etichetta']).length;
+    return `  - ${t['Etichetta']} (${t['NOME TURNO']||''} ${t['FASCIA ORARIA']||''}): ${volTot} volontari totali, varchi completi=${completi} parziali=${parziali} scoperti=${scoperti} extra=${extra}`;
+  }).join('\n');
+
+  const sezioniMap = {};
+  _volontari.forEach(v => {
+    if (!sezioniMap[v['SEZIONE']]) sezioniMap[v['SEZIONE']] = 0;
+    sezioniMap[v['SEZIONE']]++;
+  });
+  const sezioniStr = Object.entries(sezioniMap).sort((a,b)=>b[1]-a[1])
+    .map(([s,n]) => `${s}:${n}`).join(', ');
+
+  const varchiStr = _varchi.map(v => {
+    const sezioneVarco = v['SEZIONI'] || '—';
+    return `Varco ${v['VARCO']}=${sezioneVarco}`;
+  }).join(', ');
+
+  // NON_PC
+  const nonPcTot = _volontari.filter(v => v['NON_PC'] === true).length;
+  const nonPcPerSez = {};
+  _volontari.filter(v => v['NON_PC'] === true).forEach(v => {
+    nonPcPerSez[v['SEZIONE']] = (nonPcPerSez[v['SEZIONE']]||0)+1;
+  });
+  const nonPcStr = Object.entries(nonPcPerSez).map(([s,n])=>`${s}:${n}`).join(', ');
+
+  // Jolly e senza varco
+  const jollyTot = _volontari.filter(v => v['JOLLY'] === true).length;
+  const senzaVarco = _volontari.filter(v => !v['VARCO']).length;
+
+  // Lista completa volontari
+  const volList = _volontari.map(v =>
+    `${v.id}|${v['NOME_COGNOME']}|sez:${v['SEZIONE']}|turno:${v['TURNO']||'—'}|varco:${v['VARCO']||'—'}|CF:${v['CODICE_FISCALE']||'—'}|tel:${v['TELEFONO']||'—'}|nonPC:${v['NON_PC']?'SI':'no'}|jolly:${v['JOLLY']?'SI':'no'}`
+  ).join('\n');
+
+  // Lista completa mezzi
+  const mezziList = (_mezzi||[]).map(m =>
+    `${m.id}|${m['TARGA']}|${m['MARCA']||''} ${m['MODELLO']||''}|${m['TIPOLOGIA']||''}|sez:${m['SEZIONE']}|varco:${m['VARCO']||'—'}`
+  ).join('\n');
+
+  return `
+Sei Beppe, l'assistente AI genovese del portale di gestione volontari per la 97ª Adunata Nazionale Alpini - Genova 2026.
+Parli italiano corretto con qualche intercalare genovese sparso: "figeu", "ma và!", "belin" (con parsimonia), "che roba!", "ninte de ninte", "magari!", "dai su".
+NON usare mai "caro" per aprire le frasi. Usa invece aperture varie e simpatiche tipo: "Belin certo!", "Ma và, subito!", "Figeu, te lo dico subito:", "Dai su,", "Ecco qua:", "Guarda un po':", oppure inizia direttamente con la risposta senza intercalare.
+NON parlare in dialetto — solo qualche parola sparsa. Sii diretto, simpatico, un po' burbero ma amichevole come un vero genovese.
+Hai accesso COMPLETO a tutti i dati del database in tempo reale. I dati ti vengono forniti nel contesto qui sotto — usali SEMPRE per rispondere con precisione.
+In particolare:
+- _volontari contiene TUTTI i volontari con tutti i campi: NOME_COGNOME, CODICE_FISCALE, TELEFONO, TURNO, SEZIONE, VARCO, JOLLY, NON_PC
+- NON_PC=true significa che il volontario NON è di Protezione Civile
+- JOLLY=true significa che è un volontario extra
+- _varchi contiene i 24 varchi con le sezioni assegnate
+- _turni contiene gli 8 turni
+- _mezzi contiene i mezzi
+Quando ti fanno domande sui dati, analizza i dati forniti nel contesto e rispondi con numeri precisi. Non dire mai che non riesci ad accedere ai dati.
+
+=== DATI ATTUALI ===
+Totale volontari nel DB: ${_volontari.length}
+Totale varchi: ${_varchi.length} (slot totali per turno: ${_varchi.length * 2})
+Totale turni: ${_turni.length}
+Totale mezzi: ${_mezzi.length}
+
+Varchi e sezioni assegnate:
+${varchiStr}
+
+Volontari per sezione:
+${sezioniStr}
+
+Copertura per turno:
+${riepTurni}
+
+Volontari NON di Protezione Civile: ${nonPcTot} totali (per sezione: ${nonPcStr})
+Volontari extra/jolly: ${jollyTot}
+Volontari senza varco assegnato: ${senzaVarco}
+
+Lista COMPLETA volontari (id|nome|sezione|turno|varco|CF|tel|nonPC|jolly):
+${volList}
+
+Lista COMPLETA mezzi (id|targa|marca modello|tipologia|sezione|varco):
+${mezziList}
+
+=== ISTRUZIONI ===
+- Rispondi SEMPRE in italiano
+- Quando ti viene chiesto di modificare dati, descrivi cosa farai e chiedi conferma PRIMA di eseguire
+- Per modifiche usa le funzioni disponibili: sb.from('VOLONTARI').update({...}).eq('id', X) ecc.
+- Se devi eseguire una modifica confermata, rispondi con un blocco JSON speciale:
+  {"action":"supabase","table":"VOLONTARI","op":"update","data":{...},"where":{"id":X}}
+- Sii conciso e diretto nelle risposte
+- Usa emoji per rendere le risposte più leggibili
+`.trim();
+}
+
+async function aiSend() {
+  const input = document.getElementById('ai-input');
+  const testo = input.value.trim();
+  if (!testo || _aiThinking) return;
+
+  input.value = '';
+  input.style.height = '38px';
+
+  // Nascondi suggerimenti dopo primo messaggio
+  document.getElementById('ai-suggestions').style.display = 'none';
+
+  // Aggiungi messaggio utente
+  aiAddMessage('user', testo);
+  _aiHistory.push({ role: 'user', content: testo });
+
+  // Mostra "sta scrivendo..."
+  _aiThinking = true;
+  document.getElementById('ai-send').disabled = true;
+  const thinkingEl = aiAddMessage('thinking', '⏳ Sto analizzando i dati...');
+
+  try {
+    const systemPrompt = _buildAiContext();
+
+    // Usa il proxy Vercel per non esporre la API key
+    const PROXY_URL = 'https://beppe-proxy.vercel.app/api/chat';
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: systemPrompt,
+        messages: _aiHistory
+      })
+    });
+
+    const data = await response.json();
+    thinkingEl.remove();
+
+    const risposta = data.content?.[0]?.text || 'Errore nella risposta.';
+    _aiHistory.push({ role: 'assistant', content: risposta });
+
+    // Controlla se c'è un'azione da eseguire
+    const actionMatch = risposta.match(/\{"action":"supabase"[^}]+\}/);
+    if (actionMatch) {
+      try {
+        const action = JSON.parse(actionMatch[0]);
+        await _aiEseguiAzione(action);
+        const testoRisposta = risposta.replace(actionMatch[0], '').trim();
+        aiAddMessage('assistant', testoRisposta || '✅ Modifica eseguita!');
+        await _aiRefreshContext();
+      } catch(e) {
+        aiAddMessage('assistant', risposta);
+      }
+    } else {
+      aiAddMessage('assistant', risposta);
+    }
+
+  } catch(e) {
+    thinkingEl.remove();
+    aiAddMessage('assistant', '❌ Errore di connessione. Riprova.');
+    console.error(e);
+  } finally {
+    _aiThinking = false;
+    document.getElementById('ai-send').disabled = false;
+    document.getElementById('ai-input').focus();
+  }
+}
+
+async function _aiEseguiAzione(action) {
+  if (action.op === 'update') {
+    const { error } = await sb.from(action.table).update(action.data).eq(Object.keys(action.where)[0], Object.values(action.where)[0]);
+    if (error) throw error;
+  } else if (action.op === 'delete') {
+    const { error } = await sb.from(action.table).delete().eq(Object.keys(action.where)[0], Object.values(action.where)[0]);
+    if (error) throw error;
+  }
+  // Aggiorna UI se serve
+  if (action.table === 'VOLONTARI') {
+    _volontari = (await sb.from('VOLONTARI').select('*')).data || [];
+  }
+}
+
+function aiAddMessage(tipo, testo) {
+  const msgs = document.getElementById('ai-messages');
+  const div  = document.createElement('div');
+  div.className = `ai-msg ${tipo}`;
+  // Formatta il testo (bold, newline)
+  div.innerHTML = testo
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n/g,'<br>');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  IMPORT/EXPORT EXCEL VOLONTARI
+// ══════════════════════════════════════════════════════════════
+
+function scaricaTemplateExcel() {
+  const turni = _turni.length ? _turni : [];
+  const nomeTurni = turni.map(t => t['Etichetta']).join(', ') || 'TURNO1,TURNO2,...';
+
+  // Intestazione colonne
+  const headers = ['NOME_COGNOME *', 'CODICE_FISCALE', 'TELEFONO', 'TURNO *', 'NON_PC (SI/NO)'];
+  const istruzioni = [
+    ['ISTRUZIONI - NON CANCELLARE QUESTA RIGA'],
+    ['- NOME_COGNOME: obbligatorio, nome e cognome del volontario'],
+    ['- CODICE_FISCALE: facoltativo'],
+    ['- TELEFONO: facoltativo'],
+    [`- TURNO: obbligatorio, inserire uno di questi valori: ${nomeTurni}`],
+    ['- NON_PC: inserire SI se il volontario NON è di Protezione Civile, altrimenti NO o lasciare vuoto'],
+    [],
+    headers
+  ];
+
+  // Righe esempio
+  const esempi = [
+    ['MARIO ROSSI', 'RSSMRA80A01H501Z', '3331234567', turni[0]?.['Etichetta'] || 'TURNO1', 'NO'],
+    ['ANNA BIANCHI', '', '3339876543', turni[1]?.['Etichetta'] || 'TURNO2', 'SI'],
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([...istruzioni, ...esempi]);
+
+  // Larghezze colonne
+  ws['!cols'] = [{wch:30},{wch:20},{wch:16},{wch:12},{wch:16}];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Volontari');
+  XLSX.writeFile(wb, 'Template_Volontari.xlsx');
+}
+
+async function importaExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const alertEl = document.getElementById('import-alert');
+  alertEl.className = 'form-alert';
+  alertEl.textContent = 'Lettura file in corso...';
+  alertEl.style.display = 'block';
+
+  try {
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data, { type: 'array' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    // Trova le righe dati (salta istruzioni, cerca header NOME_COGNOME)
+    let startRow = 0;
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i].some(cell => String(cell).includes('NOME_COGNOME'))) {
+        startRow = i + 1;
+        break;
+      }
+    }
+    const dataRows = raw.slice(startRow).filter(r => r[0] && String(r[0]).trim());
+
+    if (!dataRows.length) {
+      showFormAlert('import-alert', 'Nessun dato trovato nel file. Controlla il formato.', 'err');
+      return;
+    }
+
+    // Recupera varco della sezione
+    const sezione = CU['SEZIONE'];
+    const varcoSezione = _varchi.find(v => v['SEZIONI'] === sezione);
+    if (!varcoSezione) {
+      showFormAlert('import-alert', 'Sezione non trovata nei varchi.', 'err');
+      return;
+    }
+
+    // Conta quanti volontari ci sono già per ogni turno in questa sezione
+    const contatoriTurno = {};
+    _turni.forEach(t => {
+      contatoriTurno[t['Etichetta']] = _volontari.filter(v =>
+        v['SEZIONE'] === sezione && v['TURNO'] === t['Etichetta']
+      ).length;
+    });
+
+    // Prepara inserimenti
+    let inseriti = 0, errori = 0;
+    const records = [];
+
+    for (const row of dataRows) {
+      const nome  = String(row[0] || '').trim();
+      const cf    = String(row[1] || '').trim().toUpperCase() || null;
+      const tel   = String(row[2] || '').trim() || null;
+      const turno = String(row[3] || '').trim().toUpperCase();
+      const nonpc = String(row[4] || '').trim().toUpperCase() === 'SI';
+
+      if (!nome || !turno) { errori++; continue; }
+
+      // Verifica turno valido
+      const turnoValido = _turni.find(t => t['Etichetta'].toUpperCase() === turno);
+      if (!turnoValido) { errori++; continue; }
+
+      // Determina se jolly (extra) in base alla posizione
+      const posizione = (contatoriTurno[turnoValido['Etichetta']] || 0);
+      const isJolly   = posizione >= 2;
+      contatoriTurno[turnoValido['Etichetta']] = posizione + 1;
+
+      records.push({
+        NOME_COGNOME:    nome,
+        CODICE_FISCALE:  cf,
+        TELEFONO:        tel,
+        TURNO:           turnoValido['Etichetta'],
+        SEZIONE:         sezione,
+        VARCO:           varcoSezione['VARCO'],
+        JOLLY:           isJolly,
+        NON_PC:          nonpc,
+      });
+    }
+
+    if (!records.length) {
+      showFormAlert('import-alert', `Nessun record valido. Righe con errori: ${errori}`, 'err');
+      return;
+    }
+
+    // Inserisci a blocchi
+    setLoading(true);
+    const CHUNK = 50;
+    for (let i = 0; i < records.length; i += CHUNK) {
+      const { error } = await sb.from('VOLONTARI').insert(records.slice(i, i + CHUNK));
+      if (error) throw error;
+      inseriti += Math.min(CHUNK, records.length - i);
+    }
+
+    input.value = ''; // reset input file
+    showFormAlert('import-alert',
+      `✅ Importati ${inseriti} volontari${errori ? ` (${errori} righe ignorate per dati mancanti)` : ''}!`,
+      'ok');
+    await renderInserimento();
+
+  } catch(e) {
+    console.error(e);
+    showFormAlert('import-alert', "Errore durante l'importazione: " + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UTILITY
+// ══════════════════════════════════════════════════════════════
+let _guidaEditOpen = false;
+
+async function renderUtility() {
+  setLoading(true);
+  const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+  try {
+    const { data: guida } = await sb.from('GUIDA').select('*').limit(1).single();
+    const testo = guida ? (guida['TESTO'] || '') : '';
+    document.getElementById('guida-view').textContent = testo;
+    document.getElementById('guida-textarea').value = testo;
+    document.getElementById('guida-edit-btn').style.display = isFull ? '' : 'none';
+
+    const { data: varchi } = await sb.from('VARCHI').select('SEZIONI').order('SEZIONI');
+    const sezioni = [...new Set((varchi||[]).map(v => v['SEZIONI']).filter(Boolean))].sort();
+    const selSez = document.getElementById('segn-sezione');
+    if (!isFull && CU['SEZIONE']) {
+      selSez.innerHTML = `<option value="${CU['SEZIONE']}" selected>${CU['SEZIONE']}</option>`;
+      selSez.disabled = true;
+    } else {
+      selSez.disabled = false;
+      selSez.innerHTML = '<option value="">Seleziona una sezione</option>' +
+        sezioni.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+    document.getElementById('segn-sezioni-count').textContent = sezioni.length + ' sezioni caricate';
+
+    if (isFull) {
+      document.getElementById('segn-lista-wrap').style.display = '';
+      const { data: segn } = await sb.from('SEGNALAZIONI').select('*').order('created_at', { ascending: false });
+      const tbody = document.getElementById('segn-tbody');
+      if (!segn || !segn.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--testo3);padding:20px">Nessuna segnalazione ricevuta</td></tr>';
+      } else {
+        tbody.innerHTML = segn.map(s => {
+          const data = new Date(s.created_at).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+          const statoClass = s['STATO']==='RISOLTA' ? 'badge-green' : s['STATO']==='IN LAVORAZIONE' ? 'badge-orange' : 'badge-grey';
+          return `<tr>
+            <td style="font-size:12px;white-space:nowrap">${data}</td>
+            <td><span class="badge badge-grey">${s['SEZIONE']||'—'}</span></td>
+            <td style="font-size:13px;max-width:400px">${s['DESCRIZIONE']||''}</td>
+            <td><span class="badge ${statoClass}">${s['STATO']||'APERTA'}</span></td>
+            <td><select onchange="cambiaStatoSegn(${s.id},this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px">
+              <option ${s['STATO']==='APERTA'?'selected':''}>APERTA</option>
+              <option ${s['STATO']==='IN LAVORAZIONE'?'selected':''}>IN LAVORAZIONE</option>
+              <option ${s['STATO']==='RISOLTA'?'selected':''}>RISOLTA</option>
+            </select></td>
+          </tr>`;
+        }).join('');
+      }
+    } else {
+      document.getElementById('segn-lista-wrap').style.display = 'none';
+    }
+  } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function toggleGuidaEdit() {
+  _guidaEditOpen = !_guidaEditOpen;
+  document.getElementById('guida-view').style.display = _guidaEditOpen ? 'none' : '';
+  document.getElementById('guida-edit-wrap').style.display = _guidaEditOpen ? '' : 'none';
+  document.getElementById('guida-edit-btn').textContent = _guidaEditOpen ? '✕ Chiudi' : '✏️ Modifica';
+}
+
+async function salvaGuida() {
+  const testo = document.getElementById('guida-textarea').value.trim();
+  if (!testo) { showFormAlert('guida-alert','Il testo non può essere vuoto','err'); return; }
+  setLoading(true);
+  try {
+    const { data: existing } = await sb.from('GUIDA').select('id').limit(1).single();
+    if (existing) {
+      await sb.from('GUIDA').update({ TESTO: testo, updated_at: new Date().toISOString() }).eq('id', existing.id);
+    } else {
+      await sb.from('GUIDA').insert({ TESTO: testo });
+    }
+    document.getElementById('guida-view').textContent = testo;
+    showFormAlert('guida-alert','✅ Guida salvata!','ok');
+    setTimeout(() => toggleGuidaEdit(), 1000);
+  } catch(e) { showFormAlert('guida-alert','Errore: '+e.message,'err'); }
+  finally { setLoading(false); }
+}
+
+async function inviaSegnalazione() {
+  const sezione = document.getElementById('segn-sezione').value || CU['SEZIONE'];
+  const descr   = document.getElementById('segn-descrizione').value.trim();
+  if (!sezione) { showFormAlert('segn-alert','Seleziona la sezione','err'); return; }
+  if (!descr)   { showFormAlert('segn-alert','Descrivi il problema','err'); return; }
+  setLoading(true);
+  try {
+    await sb.from('SEGNALAZIONI').insert({ SEZIONE: sezione, DESCRIZIONE: descr, STATO: 'APERTA' });
+    document.getElementById('segn-descrizione').value = '';
+    showFormAlert('segn-alert','✅ Segnalazione inviata! Grazie.','ok');
+  } catch(e) { showFormAlert('segn-alert','Errore: '+e.message,'err'); }
+  finally { setLoading(false); }
+}
+
+async function cambiaStatoSegn(id, stato) {
+  try { await sb.from('SEGNALAZIONI').update({ STATO: stato }).eq('id', id); }
+  catch(e) { alert('Errore: ' + e.message); }
+}
+
+</script>
 
 <!-- MODAL MODIFICA VOLONTARIO -->
 <div class="modal-overlay" id="modal-edit-vol">
