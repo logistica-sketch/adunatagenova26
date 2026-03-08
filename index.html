@@ -981,11 +981,11 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
       <div class="login-err" id="login-err"></div>
       <label class="login-label">Nome Utente</label>
       <input class="login-input" id="login-user" type="text" placeholder="Username"
-        autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+        name="username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
       <label class="login-label">Password</label>
       <div class="login-pw-wrap">
         <input class="login-input" id="login-pass" type="password" placeholder="••••••••"
-          autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+          name="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
         <button class="login-pw-toggle" onclick="togglePw()" id="pw-toggle">👁</button>
       </div>
       <button class="login-btn" id="login-btn" onclick="doLogin()">Accedi</button>
