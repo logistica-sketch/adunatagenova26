@@ -1612,8 +1612,7 @@ async function renderDashboard() {
         <div style="margin-bottom:22px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-wrap:wrap;gap:6px">
             <div>
-              <span style="font-size:15px;font-weight:700">${t['Etichetta']}</span>
-              <span style="color:var(--testo3);font-weight:400;font-size:13px;margin-left:8px">${t['FASCIA ORARIA']||''}</span>
+              <span style="font-size:15px;font-weight:700">${t['NOME TURNO'] || t['Etichetta']}</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <span style="font-size:12px;color:var(--testo3)">
@@ -1671,7 +1670,7 @@ async function renderSezioni() {
       // Lista volontari
       const volHTML = totVol ? volSez.map(v => {
         const turnoLabel = v['TURNO'] ? _turni.find(t=>t['Etichetta']===v['TURNO']) : null;
-        const turnoStr = turnoLabel ? `${v['TURNO']} – ${turnoLabel['FASCIA ORARIA']||''}` : (v['TURNO']||'—');
+        const turnoStr = turnoLabel ? (turnoLabel['NOME TURNO'] || v['TURNO']) : (v['TURNO']||'—');
         return `<div class="vol-list-item">
           <div>
             <div class="vli-nome">${v['NOME_COGNOME']}${v['NON_PC']?' &nbsp;<span class="badge badge-orange" title="Non è di Protezione Civile">NON PC</span>':''}</div>
@@ -1786,8 +1785,7 @@ async function renderGriglia() {
     document.getElementById('turno-selector').innerHTML = _turni.map(t =>
       `<button class="turno-btn${_turnoAttivo === t['Etichetta'] ? ' active' : ''}"
         onclick="cambioTurno('${t['Etichetta']}')">
-        ${t['Etichetta']}
-        <span style="font-size:10px;opacity:0.75;display:block">${(t['FASCIA ORARIA']||'').replace(' - ',' –')}</span>
+        ${t['NOME TURNO'] || t['Etichetta']}
       </button>`
     ).join('');
 
@@ -2523,7 +2521,7 @@ async function openEditVolontario(id) {
   // Popola turni
   const sel = document.getElementById('edit-vol-turno');
   sel.innerHTML = (_turni.length ? _turni : []).map(t =>
-    `<option value="${t['Etichetta']}" ${v['TURNO']===t['Etichetta']?'selected':''}>${t['Etichetta']} – ${t['FASCIA ORARIA']||''}</option>`
+    `<option value="${t['Etichetta']}" ${v['TURNO']===t['Etichetta']?'selected':''}>${t['NOME TURNO'] || t['Etichetta']}</option>`
   ).join('');
   openModal('modal-edit-vol');
 }
