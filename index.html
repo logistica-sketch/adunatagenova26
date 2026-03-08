@@ -2013,8 +2013,7 @@ function _buildAiContext() {
     });
     const volTot = _volontari.filter(v => v['TURNO'] === t['Etichetta']).length;
     return `  - ${t['Etichetta']} (${t['NOME TURNO']||''} ${t['FASCIA ORARIA']||''}): ${volTot} volontari totali, varchi completi=${completi} parziali=${parziali} scoperti=${scoperti} extra=${extra}`;
-  }).join('
-');
+  }).join('\n');
 
   const sezioniMap = {};
   _volontari.forEach(v => {
