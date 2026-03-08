@@ -423,7 +423,7 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
   /* Nascondi user + logout dalla topbar su mobile (sono nel drawer) */
   .topbar-right { display:none !important; }
   /* Nascondi navbar su mobile (è nel drawer) */
-  .navbar { display:none; }
+  .navbar { display:none !important; }
 
   /* Content full width */
   .content { padding:12px 10px; }
@@ -864,7 +864,7 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
   .topbar-right { display:none !important; }
 
   /* NAVBAR — nascosta su mobile (navigazione nel drawer) */
-  .navbar { display:none; }
+  .navbar { display:none !important; }
 
   /* CONTENT */
   .content { padding:12px 10px; }
@@ -1440,17 +1440,16 @@ async function doLogin() {
     if (error || !data) { showLoginErr('Username o password non corretti'); return; }
     CU = data;
     document.getElementById('login-screen').style.display = 'none';
-    aggiornaDrawer();
-    // Mostra AI FAB solo per ACCESSO FULL
-    if (CU['TIPOLOGIA'] === 'ACCESSO FULL') {
-      document.getElementById('ai-fab').style.display = 'flex';
-    aggiornaDrawer();
-      document.getElementById('ai-fab').classList.add('pulse');
-    }
     document.getElementById('app').style.display = 'block';
     document.getElementById('topbar-name').textContent = data['Nome Utente'];
     document.getElementById('topbar-role').textContent = data['TIPOLOGIA'] === 'ACCESSO FULL' ? 'Accesso completo' : 'Sezione: ' + (data['SEZIONE'] || '—');
     buildNavbar();
+    aggiornaDrawer();
+    // Mostra AI FAB solo per ACCESSO FULL
+    if (CU['TIPOLOGIA'] === 'ACCESSO FULL') {
+      document.getElementById('ai-fab').style.display = 'flex';
+      document.getElementById('ai-fab').classList.add('pulse');
+    }
     showTab(CU['TIPOLOGIA'] === 'ACCESSO FULL' ? 'dashboard' : 'inserimento');
   } catch(e) { showLoginErr('Errore di connessione'); }
   finally { btn.textContent = 'Accedi →'; btn.disabled = false; setLoading(false); }
@@ -1482,6 +1481,7 @@ function showTab(name) {
   document.querySelectorAll('.nav-tab[data-tab]').forEach(t => {
     if (t.dataset.tab === name) t.classList.add('active');
   });
+  aggiornaDrawerTab();
   const renders = { dashboard: renderDashboard, sezioni: renderSezioni, griglia: renderGriglia, utenti: renderUtenti, inserimento: renderInserimento, mezzi: renderInserimentoMezzi, utility: renderUtility };
   if (renders[name]) renders[name]();
 }
