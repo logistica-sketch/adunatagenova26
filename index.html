@@ -442,8 +442,28 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
       </div>
 
       <!-- INFO BOX -->
-      <div style="background:var(--verde-light);border:1px solid #b4ddbf;border-radius:var(--r);padding:14px 18px;margin-bottom:24px;font-size:13px;color:var(--verde);">
+      <div style="background:var(--verde-light);border:1px solid #b4ddbf;border-radius:var(--r);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--verde);">
         <strong>Come funziona:</strong> Inserisci i volontari per ogni turno. I primi 2 per turno vengono assegnati automaticamente al varco della tua sezione. I volontari aggiuntivi diventano <strong>jolly</strong> e possono essere spostati su altri varchi dalla pagina Gestione Turni.
+      </div>
+
+      <!-- IMPORT/EXPORT EXCEL -->
+      <div class="panel" style="margin-bottom:24px">
+        <div class="panel-header">
+          <div>
+            <span class="panel-title">Inserimento massivo da Excel</span>
+            <div style="font-size:12px;color:var(--testo3);margin-top:2px">Scarica il template, compilalo e caricalo per importare più volontari in una volta</div>
+          </div>
+        </div>
+        <div class="panel-body" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="scaricaTemplateExcel()" style="height:40px">
+            ⬇ Scarica Template Excel
+          </button>
+          <label class="btn btn-primary" style="height:40px;cursor:pointer;display:flex;align-items:center;gap:8px;margin:0">
+            ⬆ Carica Excel compilato
+            <input type="file" id="import-excel-input" accept=".xlsx,.xls" style="display:none" onchange="importaExcel(this)">
+          </label>
+          <div id="import-alert" class="form-alert" style="margin:0;flex:1"></div>
+        </div>
       </div>
 
       <div id="ins-turni-container"></div>
@@ -1868,6 +1888,153 @@ function scaricaExcelTurno() {
 
   XLSX.utils.book_append_sheet(wb, ws, turno);
   XLSX.writeFile(wb, `Riepilogo_${turno}_${turnoObj['NOME TURNO']||''}.xlsx`.replace(/\s+/g,'_'));
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  IMPORT/EXPORT EXCEL VOLONTARI
+// ══════════════════════════════════════════════════════════════
+
+function scaricaTemplateExcel() {
+  const turni = _turni.length ? _turni : [];
+  const nomeTurni = turni.map(t => t['Etichetta']).join(', ') || 'TURNO1,TURNO2,...';
+
+  // Intestazione colonne
+  const headers = ['NOME_COGNOME *', 'CODICE_FISCALE', 'TELEFONO', 'TURNO *', 'NON_PC (SI/NO)'];
+  const istruzioni = [
+    ['ISTRUZIONI - NON CANCELLARE QUESTA RIGA'],
+    ['- NOME_COGNOME: obbligatorio, nome e cognome del volontario'],
+    ['- CODICE_FISCALE: facoltativo'],
+    ['- TELEFONO: facoltativo'],
+    [`- TURNO: obbligatorio, inserire uno di questi valori: ${nomeTurni}`],
+    ['- NON_PC: inserire SI se il volontario NON è di Protezione Civile, altrimenti NO o lasciare vuoto'],
+    [],
+    headers
+  ];
+
+  // Righe esempio
+  const esempi = [
+    ['MARIO ROSSI', 'RSSMRA80A01H501Z', '3331234567', turni[0]?.['Etichetta'] || 'TURNO1', 'NO'],
+    ['ANNA BIANCHI', '', '3339876543', turni[1]?.['Etichetta'] || 'TURNO2', 'SI'],
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([...istruzioni, ...esempi]);
+
+  // Larghezze colonne
+  ws['!cols'] = [{wch:30},{wch:20},{wch:16},{wch:12},{wch:16}];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Volontari');
+  XLSX.writeFile(wb, 'Template_Volontari.xlsx');
+}
+
+async function importaExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const alertEl = document.getElementById('import-alert');
+  alertEl.className = 'form-alert';
+  alertEl.textContent = 'Lettura file in corso...';
+  alertEl.style.display = 'block';
+
+  try {
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data, { type: 'array' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    // Trova le righe dati (salta istruzioni, cerca header NOME_COGNOME)
+    let startRow = 0;
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i].some(cell => String(cell).includes('NOME_COGNOME'))) {
+        startRow = i + 1;
+        break;
+      }
+    }
+    const dataRows = raw.slice(startRow).filter(r => r[0] && String(r[0]).trim());
+
+    if (!dataRows.length) {
+      showFormAlert('import-alert', 'Nessun dato trovato nel file. Controlla il formato.', 'err');
+      return;
+    }
+
+    // Recupera varco della sezione
+    const sezione = CU['SEZIONE'];
+    const varcoSezione = _varchi.find(v => v['SEZIONI'] === sezione);
+    if (!varcoSezione) {
+      showFormAlert('import-alert', 'Sezione non trovata nei varchi.', 'err');
+      return;
+    }
+
+    // Conta quanti volontari ci sono già per ogni turno in questa sezione
+    const contatoriTurno = {};
+    _turni.forEach(t => {
+      contatoriTurno[t['Etichetta']] = _volontari.filter(v =>
+        v['SEZIONE'] === sezione && v['TURNO'] === t['Etichetta']
+      ).length;
+    });
+
+    // Prepara inserimenti
+    let inseriti = 0, errori = 0;
+    const records = [];
+
+    for (const row of dataRows) {
+      const nome  = String(row[0] || '').trim();
+      const cf    = String(row[1] || '').trim().toUpperCase() || null;
+      const tel   = String(row[2] || '').trim() || null;
+      const turno = String(row[3] || '').trim().toUpperCase();
+      const nonpc = String(row[4] || '').trim().toUpperCase() === 'SI';
+
+      if (!nome || !turno) { errori++; continue; }
+
+      // Verifica turno valido
+      const turnoValido = _turni.find(t => t['Etichetta'].toUpperCase() === turno);
+      if (!turnoValido) { errori++; continue; }
+
+      // Determina se jolly (extra) in base alla posizione
+      const posizione = (contatoriTurno[turnoValido['Etichetta']] || 0);
+      const isJolly   = posizione >= 2;
+      contatoriTurno[turnoValido['Etichetta']] = posizione + 1;
+
+      records.push({
+        NOME_COGNOME:    nome,
+        CODICE_FISCALE:  cf,
+        TELEFONO:        tel,
+        TURNO:           turnoValido['Etichetta'],
+        SEZIONE:         sezione,
+        VARCO:           varcoSezione['VARCO'],
+        JOLLY:           isJolly,
+        NON_PC:          nonpc,
+      });
+    }
+
+    if (!records.length) {
+      showFormAlert('import-alert', `Nessun record valido. Righe con errori: ${errori}`, 'err');
+      return;
+    }
+
+    // Inserisci a blocchi
+    setLoading(true);
+    const CHUNK = 50;
+    for (let i = 0; i < records.length; i += CHUNK) {
+      const { error } = await sb.from('VOLONTARI').insert(records.slice(i, i + CHUNK));
+      if (error) throw error;
+      inseriti += Math.min(CHUNK, records.length - i);
+    }
+
+    input.value = ''; // reset input file
+    showFormAlert('import-alert',
+      `✅ Importati ${inseriti} volontari${errori ? ` (${errori} righe ignorate per dati mancanti)` : ''}!`,
+      'ok');
+    await renderInserimento();
+
+  } catch(e) {
+    console.error(e);
+    showFormAlert('import-alert', 'Errore durante l'importazione: ' + e.message, 'err');
+  } finally {
+    setLoading(false);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
