@@ -2031,7 +2031,7 @@ async function importaExcel(input) {
 
   } catch(e) {
     console.error(e);
-    showFormAlert('import-alert', 'Errore durante l'importazione: ' + e.message, 'err');
+    showFormAlert('import-alert', "Errore durante l'importazione: " + e.message, 'err');
   } finally {
     setLoading(false);
   }
