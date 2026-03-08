@@ -305,6 +305,58 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
 
 /* MONO */
 .mono{font-family:'Geist Mono',monospace;font-size:12px;}
+
+/* ── AI CHAT FLOTTANTE ─────────────────────────────────────── */
+#ai-fab{position:fixed;bottom:24px;right:24px;z-index:9999;
+  width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a6e2e,#2d8a45);
+  border:none;cursor:pointer;box-shadow:0 4px 20px rgba(26,110,46,0.4);
+  display:none;align-items:center;justify-content:center;font-size:24px;
+  transition:transform 0.2s,box-shadow 0.2s;}
+#ai-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(26,110,46,0.5);}
+#ai-fab.pulse::after{content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid rgba(26,110,46,0.4);animation:pulsering 1.5s ease-out infinite;}
+@keyframes pulsering{0%{transform:scale(1);opacity:1;}100%{transform:scale(1.5);opacity:0;}}
+
+#ai-panel{position:fixed;bottom:90px;right:24px;z-index:9998;
+  width:420px;max-width:calc(100vw - 32px);height:560px;max-height:calc(100vh - 120px);
+  background:#fff;border-radius:16px;box-shadow:0 8px 48px rgba(0,0,0,0.18);
+  display:none;flex-direction:column;overflow:hidden;
+  animation:slideUpChat 0.25s ease;}
+@keyframes slideUpChat{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+#ai-panel-header{background:linear-gradient(135deg,#1a6e2e,#2d8a45);padding:14px 18px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.ai-header-left{display:flex;align-items:center;gap:10px;}
+.ai-avatar{width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:16px;}
+.ai-header-title{color:#fff;font-weight:700;font-size:14px;}
+.ai-header-sub{color:rgba(255,255,255,0.7);font-size:11px;margin-top:1px;}
+#ai-close{background:none;border:none;color:rgba(255,255,255,0.8);cursor:pointer;
+  font-size:18px;padding:4px;line-height:1;}
+#ai-close:hover{color:#fff;}
+
+#ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.ai-msg{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;}
+.ai-msg.user{background:#1a6e2e;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.ai-msg.assistant{background:#f6f8fa;color:var(--testo);align-self:flex-start;border-bottom-left-radius:4px;border:1px solid var(--border);}
+.ai-msg.thinking{background:#f6f8fa;color:var(--testo3);align-self:flex-start;font-style:italic;border:1px solid var(--border);}
+.ai-msg pre{background:#e8ecef;border-radius:6px;padding:8px;font-size:11px;overflow-x:auto;margin:6px 0 0;}
+
+#ai-input-wrap{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
+#ai-input{flex:1;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;
+  font-family:'Geist',sans-serif;font-size:13px;resize:none;height:38px;max-height:100px;
+  transition:border-color 0.15s;line-height:1.5;overflow-y:auto;}
+#ai-input:focus{outline:none;border-color:var(--verde);}
+#ai-send{width:38px;height:38px;background:#1a6e2e;border:none;border-radius:10px;
+  cursor:pointer;color:#fff;font-size:16px;flex-shrink:0;transition:background 0.15s;}
+#ai-send:hover{background:#155925;}
+#ai-send:disabled{opacity:0.5;cursor:not-allowed;}
+
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px;}
+.ai-sug-btn{background:#f0f7f2;border:1px solid #b4ddbf;color:#1a6e2e;border-radius:20px;
+  padding:5px 12px;font-size:11px;cursor:pointer;transition:background 0.15s;font-family:'Geist',sans-serif;}
+.ai-sug-btn:hover{background:#d4edda;}
+
 </style>
 </head>
 <body>
@@ -781,6 +833,11 @@ async function doLogin() {
     if (error || !data) { showLoginErr('Username o password non corretti'); return; }
     CU = data;
     document.getElementById('login-screen').style.display = 'none';
+    // Mostra AI FAB solo per ACCESSO FULL
+    if (CU['TIPOLOGIA'] === 'ACCESSO FULL') {
+      document.getElementById('ai-fab').style.display = 'flex';
+      document.getElementById('ai-fab').classList.add('pulse');
+    }
     document.getElementById('app').style.display = 'block';
     document.getElementById('topbar-name').textContent = data['Nome Utente'];
     document.getElementById('topbar-role').textContent = data['TIPOLOGIA'] === 'ACCESSO FULL' ? 'Accesso completo' : 'Sezione: ' + (data['SEZIONE'] || '—');
@@ -799,6 +856,9 @@ function doLogout() {
   CU = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('ai-fab').style.display = 'none';
+  document.getElementById('ai-panel').style.display = 'none';
+  _aiHistory = []; _aiOpen = false;
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
 }
@@ -1891,6 +1951,213 @@ function scaricaExcelTurno() {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════
+//  AI CHAT
+// ══════════════════════════════════════════════════════════════
+let _aiOpen = false;
+let _aiHistory = [];
+let _aiThinking = false;
+
+function toggleAiChat() {
+  _aiOpen = !_aiOpen;
+  const panel = document.getElementById('ai-panel');
+  const fab   = document.getElementById('ai-fab');
+  panel.style.display = _aiOpen ? 'flex' : 'none';
+  fab.classList.toggle('pulse', !_aiOpen);
+  if (_aiOpen) {
+    document.getElementById('ai-input').focus();
+    // Carica dati freschi per il contesto
+    _aiRefreshContext();
+  }
+}
+
+function aiSuggest(testo) {
+  document.getElementById('ai-input').value = testo;
+  aiSend();
+}
+
+function aiKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); }
+}
+
+async function _aiRefreshContext() {
+  // Ricarica dati aggiornati dal DB per il contesto
+  try {
+    const [{ data: volontari }, { data: varchi }, { data: turni }, { data: mezzi }, { data: mezziTurni }] = await Promise.all([
+      sb.from('VOLONTARI').select('*'),
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('TURNI').select('*').order('Etichetta'),
+      sb.from('MEZZI').select('*'),
+      sb.from('MEZZI_TURNI').select('*, MEZZI(*)'),
+    ]);
+    _volontari   = volontari   || [];
+    _varchi      = varchi      || [];
+    _turni       = turni       || [];
+    _mezzi       = mezzi       || [];
+    _mezziTurni  = mezziTurni  || [];
+  } catch(e) { console.error('AI context refresh error:', e); }
+}
+
+function _buildAiContext() {
+  // Costruisce un riepilogo dati da passare all'AI come contesto
+  const riepTurni = _turni.map(t => {
+    let completi=0, parziali=0, scoperti=0, extra=0;
+    _varchi.forEach(v => {
+      const nelVarco = _volontari
+        .filter(x => x['TURNO'] === t['Etichetta'] && x['VARCO'] == v['VARCO'])
+        .sort((a,b) => a.id - b.id);
+      const princ = nelVarco.slice(0,2).length;
+      if (princ >= 2) completi++; else if (princ === 1) parziali++; else scoperti++;
+      extra += nelVarco.slice(2).length;
+    });
+    const volTot = _volontari.filter(v => v['TURNO'] === t['Etichetta']).length;
+    return `  - ${t['Etichetta']} (${t['NOME TURNO']||''} ${t['FASCIA ORARIA']||''}): ${volTot} volontari totali, varchi completi=${completi} parziali=${parziali} scoperti=${scoperti} extra=${extra}`;
+  }).join('
+');
+
+  const sezioniMap = {};
+  _volontari.forEach(v => {
+    if (!sezioniMap[v['SEZIONE']]) sezioniMap[v['SEZIONE']] = 0;
+    sezioniMap[v['SEZIONE']]++;
+  });
+  const sezioniStr = Object.entries(sezioniMap).sort((a,b)=>b[1]-a[1])
+    .map(([s,n]) => `${s}:${n}`).join(', ');
+
+  const varchiStr = _varchi.map(v => {
+    const sezioneVarco = v['SEZIONI'] || '—';
+    return `Varco ${v['VARCO']}=${sezioneVarco}`;
+  }).join(', ');
+
+  return `
+Sei Beppe, l'assistente AI genovese DOC del portale di gestione volontari per la 97ª Adunata Nazionale Alpini - Genova 2026.
+Sei nato e cresciuto a Genova, ami la Lanterna, il pesto e la focaccia. Hai un carattere schietto, simpatico e un umorismo pungente tipico genovese.
+Usi intercalari liguri come: "caro", "figeu", "che roba!", "in bun pe ninte", "ma và!", "comme o xe", "ninte de ninte", "sò Beppe!", "belin" (quando appropriato), "comme a Lanterna", "o l'è", "de Zena".
+Sei competente e preciso nei dati, ma li presenti sempre con una battuta o un commento genovese. Non esagerare però — prima dai la risposta utile, poi aggiungi il tocco genovese.
+Hai accesso completo ai dati in tempo reale e puoi anche modificarli.
+
+=== DATI ATTUALI ===
+Totale volontari nel DB: ${_volontari.length}
+Totale varchi: ${_varchi.length} (slot totali per turno: ${_varchi.length * 2})
+Totale turni: ${_turni.length}
+Totale mezzi: ${_mezzi.length}
+
+Varchi e sezioni assegnate:
+${varchiStr}
+
+Volontari per sezione:
+${sezioniStr}
+
+Copertura per turno:
+${riepTurni}
+
+=== ISTRUZIONI ===
+- Rispondi SEMPRE in italiano
+- Quando ti viene chiesto di modificare dati, descrivi cosa farai e chiedi conferma PRIMA di eseguire
+- Per modifiche usa le funzioni disponibili: sb.from('VOLONTARI').update({...}).eq('id', X) ecc.
+- Se devi eseguire una modifica confermata, rispondi con un blocco JSON speciale:
+  {"action":"supabase","table":"VOLONTARI","op":"update","data":{...},"where":{"id":X}}
+- Sii conciso e diretto nelle risposte
+- Usa emoji per rendere le risposte più leggibili
+`.trim();
+}
+
+async function aiSend() {
+  const input = document.getElementById('ai-input');
+  const testo = input.value.trim();
+  if (!testo || _aiThinking) return;
+
+  input.value = '';
+  input.style.height = '38px';
+
+  // Nascondi suggerimenti dopo primo messaggio
+  document.getElementById('ai-suggestions').style.display = 'none';
+
+  // Aggiungi messaggio utente
+  aiAddMessage('user', testo);
+  _aiHistory.push({ role: 'user', content: testo });
+
+  // Mostra "sta scrivendo..."
+  _aiThinking = true;
+  document.getElementById('ai-send').disabled = true;
+  const thinkingEl = aiAddMessage('thinking', '⏳ Sto analizzando i dati...');
+
+  try {
+    const systemPrompt = _buildAiContext();
+
+    // Usa il proxy Vercel per non esporre la API key
+    const PROXY_URL = 'https://beppe-proxy.vercel.app/api/chat';
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: systemPrompt,
+        messages: _aiHistory
+      })
+    });
+
+    const data = await response.json();
+    thinkingEl.remove();
+
+    const risposta = data.content?.[0]?.text || 'Errore nella risposta.';
+    _aiHistory.push({ role: 'assistant', content: risposta });
+
+    // Controlla se c'è un'azione da eseguire
+    const actionMatch = risposta.match(/\{"action":"supabase"[^}]+\}/);
+    if (actionMatch) {
+      try {
+        const action = JSON.parse(actionMatch[0]);
+        await _aiEseguiAzione(action);
+        const testoRisposta = risposta.replace(actionMatch[0], '').trim();
+        aiAddMessage('assistant', testoRisposta || '✅ Modifica eseguita!');
+        await _aiRefreshContext();
+      } catch(e) {
+        aiAddMessage('assistant', risposta);
+      }
+    } else {
+      aiAddMessage('assistant', risposta);
+    }
+
+  } catch(e) {
+    thinkingEl.remove();
+    aiAddMessage('assistant', '❌ Errore di connessione. Riprova.');
+    console.error(e);
+  } finally {
+    _aiThinking = false;
+    document.getElementById('ai-send').disabled = false;
+    document.getElementById('ai-input').focus();
+  }
+}
+
+async function _aiEseguiAzione(action) {
+  if (action.op === 'update') {
+    const { error } = await sb.from(action.table).update(action.data).eq(Object.keys(action.where)[0], Object.values(action.where)[0]);
+    if (error) throw error;
+  } else if (action.op === 'delete') {
+    const { error } = await sb.from(action.table).delete().eq(Object.keys(action.where)[0], Object.values(action.where)[0]);
+    if (error) throw error;
+  }
+  // Aggiorna UI se serve
+  if (action.table === 'VOLONTARI') {
+    _volontari = (await sb.from('VOLONTARI').select('*')).data || [];
+  }
+}
+
+function aiAddMessage(tipo, testo) {
+  const msgs = document.getElementById('ai-messages');
+  const div  = document.createElement('div');
+  div.className = `ai-msg ${tipo}`;
+  // Formatta il testo (bold, newline)
+  div.innerHTML = testo
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/
+/g,'<br>');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
 // ══════════════════════════════════════════════════════════════
 //  IMPORT/EXPORT EXCEL VOLONTARI
 // ══════════════════════════════════════════════════════════════
@@ -2183,6 +2450,40 @@ async function cambiaStatoSegn(id, stato) {
       <button class="btn btn-secondary" onclick="closeModal('modal-edit-vol')">Annulla</button>
       <button class="btn btn-primary" onclick="saveEditVolontario()">💾 Salva</button>
     </div>
+  </div>
+</div>
+
+
+<!-- ── AI CHAT FLOTTANTE ── -->
+<button id="ai-fab" onclick="toggleAiChat()" title="Beppe - Assistente AI"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzFhNmUyZSIvPgogIDxyZWN0IHg9IjM4IiB5PSI3MiIgd2lkdGg9IjI0IiBoZWlnaHQ9IjIwIiByeD0iMiIgZmlsbD0iI2Y1ZjBlOCIvPgogIDxyZWN0IHg9IjQwIiB5PSI0OCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjI2IiByeD0iMSIgZmlsbD0iI2Y1ZjBlOCIvPgogIDxyZWN0IHg9IjQ0IiB5PSI1MiIgd2lkdGg9IjUiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiMxYTZlMmUiLz4KICA8cmVjdCB4PSI1MSIgeT0iNTIiIHdpZHRoPSI1IiBoZWlnaHQ9IjciIHJ4PSIxIiBmaWxsPSIjMWE2ZTJlIi8+CiAgPHJlY3QgeD0iNDQiIHk9IjYyIiB3aWR0aD0iNSIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iIzFhNmUyZSIvPgogIDxyZWN0IHg9IjUxIiB5PSI2MiIgd2lkdGg9IjUiIGhlaWdodD0iNiIgcng9IjEiIGZpbGw9IiMxYTZlMmUiLz4KICA8cmVjdCB4PSIzNyIgeT0iNDQiIHdpZHRoPSIyNiIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iI2U4ZDVhMCIvPgogIDxyZWN0IHg9IjQyIiB5PSIyOCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE4IiByeD0iMSIgZmlsbD0iI2Y1ZjBlOCIvPgogIDxyZWN0IHg9IjQ2IiB5PSIzMiIgd2lkdGg9IjgiIGhlaWdodD0iMTAiIHJ4PSIxIiBmaWxsPSIjZmZkNzAwIiBvcGFjaXR5PSIwLjkiLz4KICA8cmVjdCB4PSIzOCIgeT0iMjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iI2U4ZDVhMCIvPgogIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjIyIiByeD0iMTAiIHJ5PSI0IiBmaWxsPSIjYzAzOTJiIi8+CiAgPGVsbGlwc2UgY3g9IjUwIiBjeT0iMTkiIHJ4PSI1IiByeT0iMyIgZmlsbD0iI2ZmZDcwMCIvPgogIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjE3IiByeD0iMyIgcnk9IjQiIGZpbGw9IiNmZmE1MDAiLz4KICA8ZWxsaXBzZSBjeD0iNTAiIGN5PSIxNSIgcng9IjIiIHJ5PSIzIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIwLjgiLz4KICA8bGluZSB4MT0iNTAiIHkxPSIxNCIgeDI9IjUwIiB5Mj0iOCIgc3Ryb2tlPSIjZmZkNzAwIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC43Ii8+CiAgPGxpbmUgeDE9IjUwIiB5MT0iMTQiIHgyPSI0NCIgeTI9IjkiIHN0cm9rZT0iI2ZmZDcwMCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iNTAiIHkxPSIxNCIgeDI9IjU2IiB5Mj0iOSIgc3Ryb2tlPSIjZmZkNzAwIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNSIvPgogIDxwYXRoIGQ9Ik0xMCA4NSBRMjUgODAgNDAgODUgUTU1IDkwIDcwIDg1IFE4NSA4MCA5MCA4NSBMOTAgOTUgUTcwIDkyIDUwIDk1IFEzMCA5OCAxMCA5NSBaIiBmaWxsPSIjMDk2OWRhIiBvcGFjaXR5PSIwLjQiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMykiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=" style="width:36px;height:36px;border-radius:50%"></button>
+
+<div id="ai-panel">
+  <div id="ai-panel-header">
+    <div class="ai-header-left">
+      <div class="ai-avatar" style="background:none;width:36px;height:36px;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iIzFhNmUyZSIvPgogIDxyZWN0IHg9IjM4IiB5PSI3MiIgd2lkdGg9IjI0IiBoZWlnaHQ9IjIwIiByeD0iMiIgZmlsbD0iI2Y1ZjBlOCIvPgogIDxyZWN0IHg9IjQwIiB5PSI0OCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjI2IiByeD0iMSIgZmlsbD0iI2Y1ZjBlOCIvPgogIDxyZWN0IHg9IjQ0IiB5PSI1MiIgd2lkdGg9IjUiIGhlaWdodD0iNyIgcng9IjEiIGZpbGw9IiMxYTZlMmUiLz4KICA8cmVjdCB4PSI1MSIgeT0iNTIiIHdpZHRoPSI1IiBoZWlnaHQ9IjciIHJ4PSIxIiBmaWxsPSIjMWE2ZTJlIi8+CiAgPHJlY3QgeD0iNDQiIHk9IjYyIiB3aWR0aD0iNSIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iIzFhNmUyZSIvPgogIDxyZWN0IHg9IjUxIiB5PSI2MiIgd2lkdGg9IjUiIGhlaWdodD0iNiIgcng9IjEiIGZpbGw9IiMxYTZlMmUiLz4KICA8cmVjdCB4PSIzNyIgeT0iNDQiIHdpZHRoPSIyNiIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iI2U4ZDVhMCIvPgogIDxyZWN0IHg9IjQyIiB5PSIyOCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE4IiByeD0iMSIgZmlsbD0iI2Y1ZjBlOCIvPgogIDxyZWN0IHg9IjQ2IiB5PSIzMiIgd2lkdGg9IjgiIGhlaWdodD0iMTAiIHJ4PSIxIiBmaWxsPSIjZmZkNzAwIiBvcGFjaXR5PSIwLjkiLz4KICA8cmVjdCB4PSIzOCIgeT0iMjQiIHdpZHRoPSIyNCIgaGVpZ2h0PSI2IiByeD0iMSIgZmlsbD0iI2U4ZDVhMCIvPgogIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjIyIiByeD0iMTAiIHJ5PSI0IiBmaWxsPSIjYzAzOTJiIi8+CiAgPGVsbGlwc2UgY3g9IjUwIiBjeT0iMTkiIHJ4PSI1IiByeT0iMyIgZmlsbD0iI2ZmZDcwMCIvPgogIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjE3IiByeD0iMyIgcnk9IjQiIGZpbGw9IiNmZmE1MDAiLz4KICA8ZWxsaXBzZSBjeD0iNTAiIGN5PSIxNSIgcng9IjIiIHJ5PSIzIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIwLjgiLz4KICA8bGluZSB4MT0iNTAiIHkxPSIxNCIgeDI9IjUwIiB5Mj0iOCIgc3Ryb2tlPSIjZmZkNzAwIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC43Ii8+CiAgPGxpbmUgeDE9IjUwIiB5MT0iMTQiIHgyPSI0NCIgeTI9IjkiIHN0cm9rZT0iI2ZmZDcwMCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjUiLz4KICA8bGluZSB4MT0iNTAiIHkxPSIxNCIgeDI9IjU2IiB5Mj0iOSIgc3Ryb2tlPSIjZmZkNzAwIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNSIvPgogIDxwYXRoIGQ9Ik0xMCA4NSBRMjUgODAgNDAgODUgUTU1IDkwIDcwIDg1IFE4NSA4MCA5MCA4NSBMOTAgOTUgUTcwIDkyIDUwIDk1IFEzMCA5OCAxMCA5NSBaIiBmaWxsPSIjMDk2OWRhIiBvcGFjaXR5PSIwLjQiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMykiIHN0cm9rZS13aWR0aD0iMiIvPgo8L3N2Zz4=" style="width:36px;height:36px;border-radius:50%"></div>
+      <div>
+        <div class="ai-header-title">Beppe 🏮</div>
+        <div class="ai-header-sub">O l'assistente de Zena · Adunata 2026</div>
+      </div>
+    </div>
+    <button id="ai-close" onclick="toggleAiChat()">✕</button>
+  </div>
+  <div id="ai-messages">
+    <div class="ai-msg assistant">
+      Ciau! Sò Beppe, o genovese de Zena! 🏮<br><br>
+      Comme a Lanterna a ilumina o pòrto, mi illumino i vostri dati de l'Adunata! Posso léize i dati, modificâli e dîve chi o l'è in manco ai varchi.<br><br>
+      Cosa voéi savéi, caro?
+    </div>
+  </div>
+  <div class="ai-suggestions" id="ai-suggestions">
+    <button class="ai-sug-btn" onclick="aiSuggest('Quanti volontari ci sono in totale?')">Totale volontari</button>
+    <button class="ai-sug-btn" onclick="aiSuggest('Quali turni sono scoperti?')">Turni scoperti</button>
+    <button class="ai-sug-btn" onclick="aiSuggest('Dammi un riepilogo completo della copertura')">Riepilogo copertura</button>
+    <button class="ai-sug-btn" onclick="aiSuggest('Quali varchi hanno meno di 2 volontari?')">Varchi critici</button>
+  </div>
+  <div id="ai-input-wrap">
+    <textarea id="ai-input" placeholder="Scrivi un messaggio..." onkeydown="aiKeydown(event)" rows="1"></textarea>
+    <button id="ai-send" onclick="aiSend()">➤</button>
   </div>
 </div>
 
