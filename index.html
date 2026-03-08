@@ -849,26 +849,22 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
   body, html { overflow-x:hidden; width:100%; }
   * { box-sizing:border-box; }
 
-  /* TOPBAR — due righe su mobile */
+  /* TOPBAR — hamburger mobile */
   .topbar {
-    height:auto; padding:8px 12px;
-    display:grid;
-    grid-template-columns:1fr auto;
-    gap:4px;
+    height:54px; padding:0 12px;
+    display:flex; align-items:center; justify-content:space-between;
     position:sticky;top:0;z-index:100;
   }
-  .topbar-left { min-width:0; overflow:hidden; }
-  .topbar-brand { font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .topbar-gif { width:32px; height:32px; flex-shrink:0; }
+  .topbar-left { gap:8px; flex:1; min-width:0; overflow:hidden; }
+  .topbar-brand { font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar-gif { width:34px; height:34px; flex-shrink:0; }
   .topbar-logo-jpg { display:none; }
-  .topbar-right { justify-content:flex-end; gap:8px; }
-  .topbar-user .name { font-size:12px; }
-  .topbar-user .role { display:none; }
-  .btn-logout { font-size:11px; height:30px; padding:0 10px; }
+  /* Mostra hamburger, nascondi user+logout dalla topbar (sono nel drawer) */
+  .hamburger { display:flex; align-items:center; justify-content:center; }
+  .topbar-right { display:none !important; }
 
-  /* NAVBAR */
-  .navbar { padding:0 4px; gap:0; overflow-x:auto; -webkit-overflow-scrolling:touch; scroll-snap-type:x mandatory; }
-  .nav-tab { font-size:11px; padding:0 10px; height:36px; white-space:nowrap; flex-shrink:0; scroll-snap-align:start; }
+  /* NAVBAR — nascosta su mobile (navigazione nel drawer) */
+  .navbar { display:none; }
 
   /* CONTENT */
   .content { padding:12px 10px; }
