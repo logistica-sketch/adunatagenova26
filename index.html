@@ -2704,6 +2704,28 @@ function _buildAiContext() {
     return `Varco ${v['VARCO']}=${sezioneVarco}`;
   }).join(', ');
 
+  // NON_PC
+  const nonPcTot = _volontari.filter(v => v['NON_PC'] === true).length;
+  const nonPcPerSez = {};
+  _volontari.filter(v => v['NON_PC'] === true).forEach(v => {
+    nonPcPerSez[v['SEZIONE']] = (nonPcPerSez[v['SEZIONE']]||0)+1;
+  });
+  const nonPcStr = Object.entries(nonPcPerSez).map(([s,n])=>`${s}:${n}`).join(', ');
+
+  // Jolly e senza varco
+  const jollyTot = _volontari.filter(v => v['JOLLY'] === true).length;
+  const senzaVarco = _volontari.filter(v => !v['VARCO']).length;
+
+  // Lista completa volontari
+  const volList = _volontari.map(v =>
+    `${v.id}|${v['NOME_COGNOME']}|sez:${v['SEZIONE']}|turno:${v['TURNO']||'—'}|varco:${v['VARCO']||'—'}|CF:${v['CODICE_FISCALE']||'—'}|tel:${v['TELEFONO']||'—'}|nonPC:${v['NON_PC']?'SI':'no'}|jolly:${v['JOLLY']?'SI':'no'}`
+  ).join('\n');
+
+  // Lista completa mezzi
+  const mezziList = (_mezzi||[]).map(m =>
+    `${m.id}|${m['TARGA']}|${m['MARCA']||''} ${m['MODELLO']||''}|${m['TIPOLOGIA']||''}|sez:${m['SEZIONE']}|varco:${m['VARCO']||'—'}`
+  ).join('\n');
+
   return `
 Sei Beppe, l'assistente AI genovese del portale di gestione volontari per la 97ª Adunata Nazionale Alpini - Genova 2026.
 Parli italiano corretto con qualche intercalare genovese sparso: "figeu", "ma và!", "belin" (con parsimonia), "che roba!", "ninte de ninte", "magari!", "dai su".
