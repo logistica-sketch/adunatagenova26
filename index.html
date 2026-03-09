@@ -985,6 +985,11 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
   .content { padding:8px; }
 }
 
+/* ── MEZZO CHIP EXTRA ── */
+.mezzo-chip.extra{background:#eff3fb;border-color:#a8c0f0;}
+.mc-badge-extra{display:inline-block;background:var(--blu);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:10px;margin-top:4px;letter-spacing:0.5px;align-self:flex-start;}
+.mc-sez{font-size:10px;color:var(--testo3);margin-top:1px;}
+
 /* ── GRIGLIA SOLA LETTURA (ACCESSO SEZIONALE) ── */
 .vol-chip-table.readonly { cursor:default !important; }
 .vol-chip-table.readonly:active { opacity:1 !important; }
@@ -1098,7 +1103,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
       </div>
       <!-- Banner sola lettura (visibile solo per ACCESSO SEZIONALE) -->
       <div class="griglia-readonly-banner" id="griglia-readonly-banner" style="display:none">
-        👁 <strong>Visualizzazione sola lettura</strong> — Vengono mostrati solo i volontari della tua sezione. Nessuna modifica possibile.
+        👁 <strong>Visualizzazione sola lettura</strong> — Vengono mostrati solo i volontari e i mezzi della tua sezione. Nessuna modifica possibile.
       </div>
       <!-- Selettore turno -->
       <div class="turno-selector" id="turno-selector"></div>
@@ -1873,24 +1878,33 @@ function renderTurnoAttivo() {
   const volTurno   = _volontari.filter(v => v['TURNO'] === turno);
   const mezziTurno = _mezziTurni.filter(mt => mt['TURNO'] === turno);
 
-  // Logica extra basata sulla POSIZIONE nel varco (non sul flag JOLLY nel DB):
-  // i primi 2 volontari per varco = principali, dal 3° in poi = extra
-  // Usiamo id di inserimento (id crescente) come ordine
+  // Logica posizionale volontari: primi 2 per varco = principali, dal 3° = extra
   function splitVarco(varcoNum) {
     let tutti = volTurno.filter(x => x['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
     if (isSez) tutti = tutti.filter(x => x['SEZIONE'] === miaSez);
     return { principali: tutti.slice(0, 2), extra: tutti.slice(2) };
   }
 
+  // Logica posizionale mezzi: primo mezzo per varco = principale, dal 2° = extra
+  function splitMezziVarco(varcoNum) {
+    let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
+    if (isSez) tutti = tutti.filter(mt => mt['MEZZI']['SEZIONE'] === miaSez);
+    return { principale: tutti.slice(0, 1), extra: tutti.slice(1) };
+  }
+
   let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totExtra=0;
+  let totMezziPrinc=0, totMezziExtra=0;
   _varchi.forEach(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
     if (principali.length >= 2) completi++;
     else if (principali.length === 1) parziali++;
     else scoperti++;
     if (extra.length > 0) surplus++;
-    totPrinc += principali.length;  // solo i primi 2 per varco
-    totExtra += extra.length;       // dal 3° in poi
+    totPrinc += principali.length;
+    totExtra += extra.length;
+    const { principale: mp, extra: me } = splitMezziVarco(v['VARCO']);
+    totMezziPrinc += mp.length;
+    totMezziExtra += me.length;
   });
   const totSlot = _varchi.length * 2;
   const pCop = totSlot ? Math.round(totPrinc / totSlot * 100) : 0;
@@ -1898,17 +1912,17 @@ function renderTurnoAttivo() {
   document.getElementById('turno-stats').innerHTML = `
     <div class="ts-card"><div class="ts-num">${_varchi.length}</div><div class="ts-label">Tot. Varchi</div></div>
     <div class="ts-card"><div class="ts-num blu">${totPrinc} / ${totSlot}</div><div class="ts-label">Slot coperti</div></div>
-    <div class="ts-card"><div class="ts-num blu">${mezziTurno.length}</div><div class="ts-label">Mezzi</div></div>
+    <div class="ts-card"><div class="ts-num blu">${totMezziPrinc} / ${_varchi.length}</div><div class="ts-label">Mezzi</div></div>
     <div class="ts-card"><div class="ts-num verde">${completi}</div><div class="ts-label">Completi</div></div>
     <div class="ts-card"><div class="ts-num arancio">${parziali}</div><div class="ts-label">Parziali</div></div>
     <div class="ts-card"><div class="ts-num rosso">${scoperti}</div><div class="ts-label">Scoperti</div></div>
-    <div class="ts-card"><div class="ts-num arancio">${totExtra}</div><div class="ts-label">Extra</div></div>
+    <div class="ts-card"><div class="ts-num arancio">${totExtra + totMezziExtra}</div><div class="ts-label">Extra</div></div>
   `;
 
   const tbody = document.getElementById('varchi-tbody');
   tbody.innerHTML = _varchi.map(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
-    const mezzoSlot = mezziTurno.find(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == v['VARCO']);
+    const { principale: mezziP, extra: mezziE } = splitMezziVarco(v['VARCO']);
 
     let statoHtml;
     if (extra.length > 0 && principali.length >= 2)
@@ -1953,20 +1967,30 @@ function renderTurnoAttivo() {
          </div>`
       : (isSez && principali.length < 2 ? `<span class="slot-vuoto-readonly">slot vuoto</span>` : '');
 
-    const mezzoHtml = mezzoSlot
-      ? (isSez
-          ? `<div class="mezzo-chip readonly">
-              <div class="mc-targa">${mezzoSlot['MEZZI']['TARGA']} – ${mezzoSlot['MEZZI']['MARCA']||''} ${mezzoSlot['MEZZI']['MODELLO']||''}</div>
-              <div class="mc-tipo">${mezzoSlot['MEZZI']['TIPOLOGIA']||''}</div>
-            </div>`
-          : `<div class="mezzo-chip" draggable="true" ondragstart="dragStart(event,'mezzo',${mezzoSlot.id})">
-              <div class="mc-targa">${mezzoSlot['MEZZI']['TARGA']} – ${mezzoSlot['MEZZI']['MARCA']||''} ${mezzoSlot['MEZZI']['MODELLO']||''}</div>
-              <div class="mc-tipo">${mezzoSlot['MEZZI']['TIPOLOGIA']||''}</div>
-              <button class="mc-remove" onclick="rimuoviMezzo(${mezzoSlot.id})" title="Rimuovi">✕</button>
-            </div>`)
-      : (isSez
-          ? `<span class="nessun-mezzo-readonly">—</span>`
-          : `<span class="nessun-mezzo" onclick="openAssegnaMezzo(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">+ NESSUN MEZZO</span>`);
+    function buildMezzoChip(mt, isExtra) {
+      const m = mt['MEZZI'];
+      const badge = isExtra ? '<div class="mc-badge-extra">EXTRA</div>' : '';
+      const sezLine = `<div class="mc-sez">Sez: ${m['SEZIONE'] || '—'}</div>`;
+      if (isSez) {
+        return `<div class="mezzo-chip readonly${isExtra ? ' extra' : ''}">
+          <div class="mc-targa">${m['TARGA']} – ${m['MARCA']||''} ${m['MODELLO']||''}</div>
+          <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
+          ${sezLine}${badge}
+        </div>`;
+      }
+      return `<div class="mezzo-chip${isExtra ? ' extra' : ''}" draggable="true" ondragstart="dragStart(event,'mezzo',${mt.id})">
+        <div class="mc-targa">${m['TARGA']} – ${m['MARCA']||''} ${m['MODELLO']||''}</div>
+        <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
+        ${sezLine}${badge}
+        <button class="mc-remove" onclick="rimuoviMezzo(${mt.id})" title="Rimuovi">✕</button>
+      </div>`;
+    }
+    const chipsMP = mezziP.map(mt => buildMezzoChip(mt, false)).join('');
+    const chipsME = mezziE.map(mt => buildMezzoChip(mt, true)).join('');
+    const addMezzoBtn = !isSez
+      ? `<span class="nessun-mezzo" onclick="openAssegnaMezzo(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">+ ${mezziP.length + mezziE.length === 0 ? 'NESSUN MEZZO' : 'AGGIUNGI'}</span>`
+      : (mezziP.length + mezziE.length === 0 ? `<span class="nessun-mezzo-readonly">—</span>` : '');
+    const mezzoHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">${chipsMP}${chipsME}${addMezzoBtn}</div>`;
 
     const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
     const tdVolAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
@@ -1979,7 +2003,7 @@ function renderTurnoAttivo() {
           ${chipsP}${chipsE}${slotVuoto}
         </div>
       </td>
-      <td class="td-mezzo">${mezzoHtml}</td>
+      <td class="td-mezzo" style="vertical-align:top">${mezzoHtml}</td>
       <td class="td-stato">${statoHtml}</td>
     </tr>`;
   }).join('');
