@@ -1686,10 +1686,16 @@ async function renderDashboard() {
 async function renderSezioni() {
   setLoading(true);
   try {
+    const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+    const miaSezSezioni = CU['SEZIONE'];
     const [{ data: varchi }, { data: volontari }, { data: mezzi }, { data: mezziTurni }, { data: turni }] = await Promise.all([
       sb.from('VARCHI').select('*').order('VARCO'),
-      sb.from('VOLONTARI').select('*').order('NOME_COGNOME'),
-      sb.from('MEZZI').select('*').order('TARGA'),
+      isFull
+        ? sb.from('VOLONTARI').select('*').order('NOME_COGNOME')
+        : sb.from('VOLONTARI').select('*').eq('SEZIONE', miaSezSezioni).order('NOME_COGNOME'),
+      isFull
+        ? sb.from('MEZZI').select('*').order('TARGA')
+        : sb.from('MEZZI').select('*').eq('SEZIONE', miaSezSezioni).order('TARGA'),
       sb.from('MEZZI_TURNI').select('*'),
       sb.from('TURNI').select('*').order('Etichetta'),
     ]);
