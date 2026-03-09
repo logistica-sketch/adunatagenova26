@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Adunata 2026">
+<link rel="apple-touch-icon" href="/icon.jpg">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -1016,6 +1017,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
     <div class="login-subtitle">Accedi al sistema di gestione Varchi</div>
     <div class="login-card">
       <div class="login-err" id="login-err"></div>
+      <form autocomplete="on" onsubmit="doLogin();return false;">
       <label class="login-label">Nome Utente</label>
       <input class="login-input" id="login-user" type="text" placeholder="Username"
         name="username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
@@ -1023,9 +1025,10 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
       <div class="login-pw-wrap">
         <input class="login-input" id="login-pass" type="password" placeholder="••••••••"
           name="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-        <button class="login-pw-toggle" onclick="togglePw()" id="pw-toggle">👁</button>
+        <button class="login-pw-toggle" type="button" onclick="togglePw()" id="pw-toggle">👁</button>
       </div>
-      <button class="login-btn" id="login-btn" onclick="doLogin()">Accedi</button>
+      <button class="login-btn" id="login-btn" type="submit">Accedi</button>
+      </form>
     </div>
     <div class="login-footer">Utilizzare le credenziali fornite dall'amministratore</div>
   </div>
