@@ -1098,7 +1098,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
       </div>
       <!-- Banner sola lettura (visibile solo per ACCESSO SEZIONALE) -->
       <div class="griglia-readonly-banner" id="griglia-readonly-banner" style="display:none">
-        👁 <strong>Visualizzazione sola lettura</strong> — Stai vedendo tutti i varchi. I volontari della tua sezione sono evidenziati in verde.
+        👁 <strong>Visualizzazione sola lettura</strong> — Vengono mostrati solo i volontari della tua sezione. Nessuna modifica possibile.
       </div>
       <!-- Selettore turno -->
       <div class="turno-selector" id="turno-selector"></div>
@@ -1807,7 +1807,7 @@ async function renderGriglia() {
     document.getElementById('griglia-readonly-banner').style.display = isSezGriglia ? '' : 'none';
     const pageSubtitle = document.querySelector('#tab-griglia .page-title small');
     if (pageSubtitle) pageSubtitle.textContent = isSezGriglia
-      ? 'Sola lettura · I tuoi volontari sono evidenziati in verde'
+      ? 'Sola lettura · visibili solo i volontari della tua sezione'
       : 'Seleziona un turno · trascina i volontari extra per spostarli';
     const thVol = document.getElementById('griglia-th-volontari');
     if (thVol) thVol.textContent = isSezGriglia ? 'Volontari Assegnati' : 'Volontari Assegnati (trascina per spostare)';
@@ -1844,7 +1844,8 @@ function renderTurnoAttivo() {
   // i primi 2 volontari per varco = principali, dal 3° in poi = extra
   // Usiamo id di inserimento (id crescente) come ordine
   function splitVarco(varcoNum) {
-    const tutti = volTurno.filter(x => x['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
+    let tutti = volTurno.filter(x => x['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
+    if (isSez) tutti = tutti.filter(x => x['SEZIONE'] === miaSez);
     return { principali: tutti.slice(0, 2), extra: tutti.slice(2) };
   }
 
@@ -1887,8 +1888,7 @@ function renderTurnoAttivo() {
       statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
 
     const chipsP = principali.map(vol => {
-      const isMyVol = isSez && vol['SEZIONE'] === miaSez;
-      const classes = 'vol-chip-table' + (isSez ? ' readonly' : '') + (isMyVol ? ' mia-sezione' : '');
+      const classes = 'vol-chip-table' + (isSez ? ' readonly' : '');
       const drag = isSez ? '' : `draggable="true" ondragstart="dragStart(event,'vol',${vol.id})"`;
       const removeBtn = isSez ? '' : `<button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>`;
       return `<div class="${classes}" ${drag}>
@@ -1900,8 +1900,7 @@ function renderTurnoAttivo() {
     }).join('');
 
     const chipsE = extra.map(vol => {
-      const isMyVol = isSez && vol['SEZIONE'] === miaSez;
-      const classes = 'vol-chip-table extra' + (isSez ? ' readonly' : '') + (isMyVol ? ' mia-sezione' : '');
+      const classes = 'vol-chip-table extra' + (isSez ? ' readonly' : '');
       const drag = isSez ? '' : `draggable="true" ondragstart="dragStart(event,'vol',${vol.id})"`;
       const removeBtn = isSez ? '' : `<button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>`;
       return `<div class="${classes}" ${drag}>
