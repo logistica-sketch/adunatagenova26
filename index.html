@@ -1993,17 +1993,17 @@ function renderTurnoAttivo() {
     const mezzoHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">${chipsMP}${chipsME}${addMezzoBtn}</div>`;
 
     const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
-    const tdVolAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
+    const dropAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
 
     return `<tr${isMiaRiga ? ' class="mia-sezione-row"' : ''}>
       <td class="td-varco">${v['VARCO']}</td>
       <td class="td-sezione">${v['SEZIONI'] || '—'}</td>
-      <td class="td-volontari" ${tdVolAttrs}>
+      <td class="td-volontari" ${dropAttrs}>
         <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">
           ${chipsP}${chipsE}${slotVuoto}
         </div>
       </td>
-      <td class="td-mezzo" style="vertical-align:top">${mezzoHtml}</td>
+      <td class="td-mezzo" style="vertical-align:top" ${dropAttrs}>${mezzoHtml}</td>
       <td class="td-stato">${statoHtml}</td>
     </tr>`;
   }).join('');
@@ -2047,7 +2047,12 @@ async function dropOnVarco(e, varco, turno) {
       }).eq('id', _dragData.id);
     } else if (_dragData.tipo === 'mezzo') {
       const mt = _mezziTurni.find(m => m.id === _dragData.id);
-      if (mt) await sb.from('MEZZI').update({ VARCO: varco }).eq('id', mt['MEZZO_ID']);
+      if (mt) {
+        await sb.from('MEZZI').update({ VARCO: varco }).eq('id', mt['MEZZO_ID']);
+        if (mt['TURNO'] !== turno) {
+          await sb.from('MEZZI_TURNI').update({ TURNO: turno }).eq('id', mt.id);
+        }
+      }
     }
     _dragData = null;
     await renderGriglia();
