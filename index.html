@@ -985,6 +985,16 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
   .content { padding:8px; }
 }
 
+/* ── GRIGLIA SOLA LETTURA (ACCESSO SEZIONALE) ── */
+.vol-chip-table.readonly { cursor:default !important; }
+.vol-chip-table.readonly:active { opacity:1 !important; }
+.vol-chip-table.mia-sezione { border:2px solid var(--verde) !important; box-shadow:0 0 0 3px rgba(26,110,46,0.15); }
+.mezzo-chip.readonly { cursor:default !important; }
+tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
+.griglia-readonly-banner { background:var(--arancio-light);border:1px solid var(--arancio);border-radius:var(--r);padding:10px 16px;margin-bottom:16px;font-size:13px;color:#7c5a00;display:flex;align-items:center;gap:8px; }
+.slot-vuoto-readonly { font-size:11px;color:var(--testo3);font-style:italic;padding:6px 8px;display:inline-block; }
+.nessun-mezzo-readonly { font-size:11px;color:var(--testo3);font-style:italic; }
+
 </style>
 </head>
 <body>
@@ -1086,6 +1096,10 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
         <button class="btn btn-secondary" onclick="renderGriglia()">↻ Aggiorna</button>
         <button class="btn btn-primary" onclick="scaricaExcelTurno()" style="background:#217346;border-color:#1a5c38">⬇ Scarica Excel</button>
       </div>
+      <!-- Banner sola lettura (visibile solo per ACCESSO SEZIONALE) -->
+      <div class="griglia-readonly-banner" id="griglia-readonly-banner" style="display:none">
+        👁 <strong>Visualizzazione sola lettura</strong> — Stai vedendo tutti i varchi. I volontari della tua sezione sono evidenziati in verde.
+      </div>
       <!-- Selettore turno -->
       <div class="turno-selector" id="turno-selector"></div>
       <!-- Stats turno -->
@@ -1098,7 +1112,7 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
             <tr>
               <th>Varco</th>
               <th>Sezione</th>
-              <th>Volontari Assegnati (trascina per spostare)</th>
+              <th id="griglia-th-volontari">Volontari Assegnati (trascina per spostare)</th>
               <th>Mezzo</th>
               <th>Stato</th>
             </tr>
@@ -1442,6 +1456,7 @@ function buildNavbar() {
   ];
 
   const tabsSez = [
+    { id:'griglia',     label:'Gestione Turni' },
     { id:'inserimento', label:'Inserimento Volontari' },
     { id:'mezzi',       label:'Inserimento Mezzi' },
     { id:'sezioni',     label:'I miei Volontari' },
@@ -1787,6 +1802,16 @@ async function renderGriglia() {
     _volontari = volontari || []; _mezzi = mezzi || [];
     _mezziTurni = mezziTurni || [];
 
+    // Aggiorna intestazione in base al tipo di accesso
+    const isSezGriglia = CU && CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE';
+    document.getElementById('griglia-readonly-banner').style.display = isSezGriglia ? '' : 'none';
+    const pageSubtitle = document.querySelector('#tab-griglia .page-title small');
+    if (pageSubtitle) pageSubtitle.textContent = isSezGriglia
+      ? 'Sola lettura · I tuoi volontari sono evidenziati in verde'
+      : 'Seleziona un turno · trascina i volontari extra per spostarli';
+    const thVol = document.getElementById('griglia-th-volontari');
+    if (thVol) thVol.textContent = isSezGriglia ? 'Volontari Assegnati' : 'Volontari Assegnati (trascina per spostare)';
+
     // Selettore turni
     if (!_turnoAttivo && _turni.length) _turnoAttivo = _turni[0]['Etichetta'];
     document.getElementById('turno-selector').innerHTML = _turni.map(t =>
@@ -1810,6 +1835,8 @@ function cambioTurno(et) {
 
 function renderTurnoAttivo() {
   const turno = _turnoAttivo;
+  const isSez = CU && CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE';
+  const miaSez = isSez ? (CU['SEZIONE'] || '') : null;
   const volTurno   = _volontari.filter(v => v['TURNO'] === turno);
   const mezziTurno = _mezziTurni.filter(mt => mt['TURNO'] === turno);
 
@@ -1859,45 +1886,63 @@ function renderTurnoAttivo() {
     else
       statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
 
-    const chipsP = principali.map(vol => `
-      <div class="vol-chip-table" draggable="true" ondragstart="dragStart(event,'vol',${vol.id})">
+    const chipsP = principali.map(vol => {
+      const isMyVol = isSez && vol['SEZIONE'] === miaSez;
+      const classes = 'vol-chip-table' + (isSez ? ' readonly' : '') + (isMyVol ? ' mia-sezione' : '');
+      const drag = isSez ? '' : `draggable="true" ondragstart="dragStart(event,'vol',${vol.id})"`;
+      const removeBtn = isSez ? '' : `<button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>`;
+      return `<div class="${classes}" ${drag}>
         <div class="vc-nome">${vol['NOME_COGNOME']}</div>
         <div class="vc-sez">Sez: ${vol['SEZIONE'] || '—'}</div>
         <div class="vc-tel">${vol['TELEFONO'] ? `<a href="tel:${vol['TELEFONO'].replace(/\s/g,'')}" style="color:inherit;text-decoration:none">${vol['TELEFONO']}</a>` : ''}</div>
-        <button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>
-      </div>`).join('');
+        ${removeBtn}
+      </div>`;
+    }).join('');
 
-    const chipsE = extra.map(vol => `
-      <div class="vol-chip-table extra" draggable="true" ondragstart="dragStart(event,'vol',${vol.id})">
+    const chipsE = extra.map(vol => {
+      const isMyVol = isSez && vol['SEZIONE'] === miaSez;
+      const classes = 'vol-chip-table extra' + (isSez ? ' readonly' : '') + (isMyVol ? ' mia-sezione' : '');
+      const drag = isSez ? '' : `draggable="true" ondragstart="dragStart(event,'vol',${vol.id})"`;
+      const removeBtn = isSez ? '' : `<button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>`;
+      return `<div class="${classes}" ${drag}>
         <div class="vc-nome">${vol['NOME_COGNOME']}</div>
         <div class="vc-sez">Sez: ${vol['SEZIONE'] || '—'}</div>
         <div class="vc-tel">${vol['TELEFONO'] ? `<a href="tel:${vol['TELEFONO'].replace(/\s/g,'')}" style="color:inherit;text-decoration:none">${vol['TELEFONO']}</a>` : ''}</div>
         <div class="vc-badge-extra">EXTRA</div>
-        <button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>
-      </div>`).join('');
+        ${removeBtn}
+      </div>`;
+    }).join('');
 
-    const slotVuoto = principali.length < 2
+    const slotVuoto = (!isSez && principali.length < 2)
       ? `<div class="slot-drop-zone"
            ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"
            onclick="openAssegnaVol(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">
            + Trascina volontario qui
-         </div>` : '';
+         </div>`
+      : (isSez && principali.length < 2 ? `<span class="slot-vuoto-readonly">slot vuoto</span>` : '');
 
     const mezzoHtml = mezzoSlot
-      ? `<div class="mezzo-chip" draggable="true" ondragstart="dragStart(event,'mezzo',${mezzoSlot.id})">
-          <div class="mc-targa">${mezzoSlot['MEZZI']['TARGA']} – ${mezzoSlot['MEZZI']['MARCA']||''} ${mezzoSlot['MEZZI']['MODELLO']||''}</div>
-          <div class="mc-tipo">${mezzoSlot['MEZZI']['TIPOLOGIA']||''}</div>
-          <button class="mc-remove" onclick="rimuoviMezzo(${mezzoSlot.id})" title="Rimuovi">✕</button>
-        </div>`
-      : `<span class="nessun-mezzo" onclick="openAssegnaMezzo(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">+ NESSUN MEZZO</span>`;
+      ? (isSez
+          ? `<div class="mezzo-chip readonly">
+              <div class="mc-targa">${mezzoSlot['MEZZI']['TARGA']} – ${mezzoSlot['MEZZI']['MARCA']||''} ${mezzoSlot['MEZZI']['MODELLO']||''}</div>
+              <div class="mc-tipo">${mezzoSlot['MEZZI']['TIPOLOGIA']||''}</div>
+            </div>`
+          : `<div class="mezzo-chip" draggable="true" ondragstart="dragStart(event,'mezzo',${mezzoSlot.id})">
+              <div class="mc-targa">${mezzoSlot['MEZZI']['TARGA']} – ${mezzoSlot['MEZZI']['MARCA']||''} ${mezzoSlot['MEZZI']['MODELLO']||''}</div>
+              <div class="mc-tipo">${mezzoSlot['MEZZI']['TIPOLOGIA']||''}</div>
+              <button class="mc-remove" onclick="rimuoviMezzo(${mezzoSlot.id})" title="Rimuovi">✕</button>
+            </div>`)
+      : (isSez
+          ? `<span class="nessun-mezzo-readonly">—</span>`
+          : `<span class="nessun-mezzo" onclick="openAssegnaMezzo(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">+ NESSUN MEZZO</span>`);
 
-    return `<tr>
+    const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
+    const tdVolAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
+
+    return `<tr${isMiaRiga ? ' class="mia-sezione-row"' : ''}>
       <td class="td-varco">${v['VARCO']}</td>
       <td class="td-sezione">${v['SEZIONI'] || '—'}</td>
-      <td class="td-volontari"
-        ondragover="dragOver(event)"
-        ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')"
-        ondragleave="dragLeave(event)">
+      <td class="td-volontari" ${tdVolAttrs}>
         <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">
           ${chipsP}${chipsE}${slotVuoto}
         </div>
