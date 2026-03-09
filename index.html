@@ -2792,12 +2792,11 @@ function aggiornaDrawer() {
   const navEl = document.getElementById('drawer-nav');
   const tabs = document.querySelectorAll('.nav-tab');
   navEl.innerHTML = '';
-  const icons = {'Dashboard':'📊','Volontari per Sezione':'👥','Gestione Turni':'📅','Inserimento Volontari':'➕','Inserimento Mezzi':'🚗','I miei Volontari':'👤','Utility':'🔧'};
   tabs.forEach(tab => {
     const label = tab.textContent.trim();
     const btn = document.createElement('button');
     btn.className = 'drawer-tab' + (tab.classList.contains('active') ? ' active' : '');
-    btn.innerHTML = `<span style="font-size:18px">${icons[label]||'•'}</span> ${label}`;
+    btn.textContent = label;
     btn.onclick = () => {
       tab.click();
       closeDrawer();
