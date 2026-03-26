@@ -2804,7 +2804,7 @@ async function scaricaTabellaPresidio(btn) {
     const [{ data: varchi, error: eV }, { data: volontari, error: eW }] = await Promise.all([
       sb.from('VARCHI').select('VARCO, SEZIONI').order('VARCO', { ascending: true }),
       sb.from('VOLONTARI').select('id, NOME_COGNOME, TELEFONO, SEZIONE, TURNO, VARCO')
-        .eq('JOLLY', false).order('id', { ascending: true })
+        .order('id', { ascending: true })
     ]);
     if (eV) throw new Error('VARCHI: ' + eV.message);
     if (eW) throw new Error('VOLONTARI: ' + eW.message);
