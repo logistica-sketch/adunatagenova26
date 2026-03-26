@@ -1104,6 +1104,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         <div class="page-title">Gestione Turni <small>Seleziona un turno · trascina i volontari extra per spostarli</small></div>
         <button class="btn btn-secondary" onclick="renderGriglia()">↻ Aggiorna</button>
         <button class="btn btn-primary" onclick="scaricaExcelTurno()" style="background:#217346;border-color:#1a5c38">⬇ Scarica Excel</button>
+        <button class="btn btn-primary" onclick="scaricaTabellaPresidio(this)" style="background:#1a6b8a;border-color:#155a75">📊 Scarica Tabella Presidio</button>
       </div>
       <!-- Banner sola lettura (visibile solo per ACCESSO SEZIONALE) -->
       <div class="griglia-readonly-banner" id="griglia-readonly-banner" style="display:none">
@@ -2789,6 +2790,166 @@ function scaricaExcelTurno() {
   XLSX.writeFile(wb, `Riepilogo_${turno}_${turnoObj['NOME TURNO']||''}.xlsx`.replace(/\s+/g,'_'));
 }
 
+
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORT EXCEL TABELLA PRESIDIO VARCHI
+// ══════════════════════════════════════════════════════════════
+async function scaricaTabellaPresidio(btn) {
+  const origHTML = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generazione...'; }
+
+  try {
+    const [{ data: turni, error: e1 }, { data: varchi, error: e2 }, { data: volontari, error: e3 }] = await Promise.all([
+      sb.from('TURNI').select('*').order('Etichetta'),
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('VOLONTARI').select('id, NOME_COGNOME, TELEFONO, SEZIONE, TURNO, VARCO, JOLLY').eq('JOLLY', false).order('id')
+    ]);
+    if (e1 || e2 || e3) throw new Error((e1 || e2 || e3).message);
+
+    const FIXED = 5;       // colonne fisse sinistra
+    const PER_TURNO = 5;   // NOME, COGNOME, TELEFONO, MAIL, GRUPPO
+    const TOTAL = FIXED + PER_TURNO * 4; // 25
+
+    const giorniConfig = [
+      {
+        sheetName: 'VENERDI CALENDARIO PRESENZE',
+        giornoLabel: 'VENERDI 08 MAGGIO',
+        giornoKey: 'VEN',
+        turniLabels: [
+          "I\u00b0 TURNO (8 ORE) DALLE 23:00 ALLE 07:00",
+          "II\u00b0 TURNO (5 ORE) DALLE 07:00 ALLE 12:00",
+          "III\u00b0 TURNO (6 ORE) DALLE 12:00 ALLE 18:00",
+          "IV\u00b0 TURNO (5 ORE) DALLE 18:00 ALLE 23:00"
+        ]
+      },
+      {
+        sheetName: 'SABATO CALENDARIO PRESENZE',
+        giornoLabel: 'SABATO 09 MAGGIO',
+        giornoKey: 'SAB',
+        turniLabels: [
+          "I\u00b0 TURNO (8 ORE) DALLE 23:00 ALLE 07:00",
+          "II\u00b0 TURNO (5 ORE) DALLE 07:00 ALLE 12:00",
+          "III\u00b0 TURNO (6 ORE) DALLE 12:00 ALLE 18:00",
+          "IV\u00b0 TURNO (5 ORE) DALLE 18:00 ALLE 23:00"
+        ]
+      },
+      {
+        sheetName: 'DOMENICA CALENDARIO PRESENZE',
+        giornoLabel: 'DOMENICA 10 MAGGIO',
+        giornoKey: 'DOM',
+        turniLabels: [
+          "I\u00b0 TURNO (7 ORE) DALLE 23:00 ALLE 06:00",
+          "II\u00b0 TURNO (6 ORE) DALLE 06:00 ALLE 12:00",
+          "III\u00b0 TURNO (6 ORE) DALLE 12:00 ALLE 18:00",
+          "IV\u00b0 TURNO (4 ORE) DALLE 18:00 ALLE 22:00"
+        ]
+      }
+    ];
+
+    const wb = XLSX.utils.book_new();
+
+    for (const g of giorniConfig) {
+      const turniGiorno = (turni || [])
+        .filter(t => t['Etichetta'].startsWith(g.giornoKey))
+        .sort((a, b) => a['Etichetta'].localeCompare(b['Etichetta']));
+
+      // Mappa I°→giornoKey1, II°→giornoKey2, III°→giornoKey3, IV°→giornoKey4
+      const etichette = [1, 2, 3, 4].map(i => {
+        const found = turniGiorno.find(t => t['Etichetta'] === `${g.giornoKey}${i}`);
+        return found ? found['Etichetta'] : (turniGiorno[i - 1] ? turniGiorno[i - 1]['Etichetta'] : null);
+      });
+
+      const rows = [];
+      const merges = [];
+
+      // Riga 0: titolo principale
+      rows.push(['ADUNATA NAZIONALE ALPINI - GENOVA 2026', ...Array(TOTAL - 1).fill('')]);
+      merges.push({ s: {r:0, c:0}, e: {r:0, c:TOTAL - 1} });
+
+      // Riga 1: sotto-titolo
+      rows.push(['AREA PEDONALE ALPINA 08-10 MAGGIO 2026', ...Array(TOTAL - 1).fill('')]);
+      merges.push({ s: {r:1, c:0}, e: {r:1, c:TOTAL - 1} });
+
+      // Riga 2: vuota
+      rows.push(Array(TOTAL).fill(''));
+
+      // Riga 3: intestazione giorno ripetuta per ogni turno
+      const row3 = Array(TOTAL).fill('');
+      for (let i = 0; i < 4; i++) {
+        const c = FIXED + i * PER_TURNO;
+        row3[c] = g.giornoLabel;
+        merges.push({ s: {r:3, c}, e: {r:3, c: c + PER_TURNO - 1} });
+      }
+      rows.push(row3);
+
+      // Riga 4: etichette turno
+      const row4 = Array(TOTAL).fill('');
+      for (let i = 0; i < 4; i++) {
+        const c = FIXED + i * PER_TURNO;
+        row4[c] = g.turniLabels[i];
+        merges.push({ s: {r:4, c}, e: {r:4, c: c + PER_TURNO - 1} });
+      }
+      rows.push(row4);
+
+      // Riga 5: sub-headers colonne
+      rows.push([
+        'PERIODO', 'N. VARCO', 'POSIZIONE', 'POSIZIONE', 'POSIZIONE',
+        ...Array(4).fill(['NOME', 'COGNOME', 'TELEFONO', 'MAIL', 'GRUPPO']).flat()
+      ]);
+
+      // Righe dati: 2 slot per varco (i 2 volontari principali)
+      for (const varco of (varchi || [])) {
+        const vNum = varco['VARCO'];
+        for (let slot = 0; slot < 2; slot++) {
+          const row = [
+            slot === 0 ? g.giornoLabel : '',
+            slot === 0 ? vNum : '',
+            slot === 0 ? (varco['SEZIONI'] || '') : '',
+            '',
+            ''
+          ];
+          for (let ti = 0; ti < 4; ti++) {
+            const et = etichette[ti];
+            if (!et) { row.push('', '', '', '', ''); continue; }
+            const vols = (volontari || [])
+              .filter(v => v['TURNO'] === et && Number(v['VARCO']) === Number(vNum))
+              .sort((a, b) => a.id - b.id);
+            const vol = vols[slot] || null;
+            if (vol) {
+              const parts = (vol['NOME_COGNOME'] || '').trim().split(/\s+/);
+              const nome = parts[0] || '';
+              const cognome = parts.slice(1).join(' ') || '';
+              row.push(nome, cognome, vol['TELEFONO'] || '', '', vol['SEZIONE'] || '');
+            } else {
+              row.push('', '', '', '', '');
+            }
+          }
+          rows.push(row);
+        }
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!merges'] = merges;
+      ws['!cols'] = [
+        {wch:20}, {wch:8}, {wch:22}, {wch:12}, {wch:12},
+        ...Array(20).fill(null).map((_, i) => {
+          const c = i % 5;
+          return c === 0 ? {wch:14} : c === 1 ? {wch:20} : c === 2 ? {wch:14} : c === 3 ? {wch:25} : {wch:18};
+        })
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, g.sheetName);
+    }
+
+    XLSX.writeFile(wb, 'TABELLA_PRESIDIO_VARCHI_2026.xlsx');
+
+  } catch (err) {
+    console.error(err);
+    alert('Errore generazione tabella presidio: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHTML; }
+  }
+}
 
 
 
