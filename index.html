@@ -2800,21 +2800,24 @@ async function scaricaTabellaPresidio(btn) {
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generazione...'; }
 
   try {
+    // ── 1. Carica dati da Supabase ──────────────────────────────
     const [{ data: turni, error: e1 }, { data: varchi, error: e2 }, { data: volontari, error: e3 }] = await Promise.all([
-      sb.from('TURNI').select('*').order('Etichetta'),
-      sb.from('VARCHI').select('*').order('VARCO'),
-      sb.from('VOLONTARI').select('id, NOME_COGNOME, TELEFONO, SEZIONE, TURNO, VARCO, JOLLY').eq('JOLLY', false).order('id')
+      sb.from('TURNI').select('*'),
+      sb.from('VARCHI').select('VARCO, SEZIONI').order('VARCO', { ascending: true }),
+      sb.from('VOLONTARI').select('id, NOME_COGNOME, TELEFONO, SEZIONE, TURNO, VARCO').eq('JOLLY', false).order('id', { ascending: true })
     ]);
-    if (e1 || e2 || e3) throw new Error((e1 || e2 || e3).message);
+    if (e1) throw new Error('TURNI: ' + e1.message);
+    if (e2) throw new Error('VARCHI: ' + e2.message);
+    if (e3) throw new Error('VOLONTARI: ' + e3.message);
 
-    // Riga intestazione: 2 colonne fisse + 5 campi × 4 turni = 22 colonne
-    const TURNO_LABELS = ['I\u00b0 TURNO', 'II\u00b0 TURNO', 'III\u00b0 TURNO', 'IV\u00b0 TURNO'];
-    const COL_FIELDS   = ['NOME', 'COGNOME', 'TELEFONO', 'MAIL', 'GRUPPO'];
+    // ── 2. Intestazione: 2 colonne fisse + 5 × 4 turni = 22 colonne ──
+    const T_LABELS = ['I\u00b0T', 'II\u00b0T', 'III\u00b0T', 'IV\u00b0T'];
     const header = ['N.VARCO', 'POSIZIONE'];
-    for (const tl of TURNO_LABELS) {
-      for (const f of COL_FIELDS) header.push(`${tl} - ${f}`);
+    for (const tl of T_LABELS) {
+      header.push(`${tl}-NOME`, `${tl}-COGNOME`, `${tl}-TELEFONO`, `${tl}-MAIL`, `${tl}-GRUPPO`);
     }
 
+    // ── 3. Fogli per giorno ─────────────────────────────────────
     const giorniConfig = [
       { sheetName: 'VENERDI',  giornoKey: 'VENERDI'  },
       { sheetName: 'SABATO',   giornoKey: 'SABATO'   },
@@ -2824,37 +2827,58 @@ async function scaricaTabellaPresidio(btn) {
     const wb = XLSX.utils.book_new();
 
     for (const g of giorniConfig) {
-      // Turni del giorno ordinati numericamente (es. "TURNO 1" < "TURNO 2" < ...)
+      // Turni del giorno, ordinati per numero progressivo dell'Etichetta
+      // (es. "TURNO 1" < "TURNO 2"). NON si usa FASCIA ORARIA perché
+      // il turno notturno "23:00" sarebbe ordinato dopo "18:00".
       const turniGiorno = (turni || [])
-        .filter(t => (t['GIORNO'] || '').toUpperCase() === g.giornoKey)
+        .filter(t => (t['GIORNO'] || '').trim().toUpperCase() === g.giornoKey)
         .sort((a, b) => {
-          const nA = parseInt((a['Etichetta'] || '').replace(/\D/g, '')) || 0;
-          const nB = parseInt((b['Etichetta'] || '').replace(/\D/g, '')) || 0;
+          const nA = parseInt((a['Etichetta'] || '').replace(/\D/g, ''), 10) || 0;
+          const nB = parseInt((b['Etichetta'] || '').replace(/\D/g, ''), 10) || 0;
           return nA - nB;
         });
 
-      // I°=idx 0, II°=idx 1, III°=idx 2, IV°=idx 3
-      const etichette = [0, 1, 2, 3].map(i => turniGiorno[i] ? turniGiorno[i]['Etichetta'] : null);
+      // I°=idx0, II°=idx1, III°=idx2, IV°=idx3  (null se non esiste)
+      const etichette = [0, 1, 2, 3].map(i => (turniGiorno[i] || {})['Etichetta'] || null);
+
+      // Precalcola mappa turno → varco → [vol1, vol2] per performance
+      const mapVol = {};
+      for (const et of etichette) {
+        if (!et) continue;
+        mapVol[et] = {};
+        const volsInTurno = (volontari || []).filter(v => v['TURNO'] === et);
+        for (const v of volsInTurno) {
+          const vk = String(v['VARCO']);
+          if (!mapVol[et][vk]) mapVol[et][vk] = [];
+          if (mapVol[et][vk].length < 2) mapVol[et][vk].push(v);
+        }
+      }
 
       const rows = [header];
 
       for (const varco of (varchi || [])) {
         const vNum = varco['VARCO'];
+        const vKey = String(vNum);
+        const posizione = varco['SEZIONI'] || '';
+
         for (let slot = 0; slot < 2; slot++) {
           const row = [
             slot === 0 ? vNum : '',
-            slot === 0 ? (varco['SEZIONI'] || '') : ''
+            slot === 0 ? posizione : ''
           ];
           for (let ti = 0; ti < 4; ti++) {
             const et = etichette[ti];
             if (!et) { row.push('', '', '', '', ''); continue; }
-            const vols = (volontari || [])
-              .filter(v => v['TURNO'] === et && Number(v['VARCO']) === Number(vNum))
-              .sort((a, b) => a.id - b.id);
-            const vol = vols[slot] || null;
+            const vols = (mapVol[et] && mapVol[et][vKey]) ? mapVol[et][vKey] : [];
+            const vol  = vols[slot] || null;
             if (vol) {
-              const parts = (vol['NOME_COGNOME'] || '').trim().split(/\s+/);
-              row.push(parts[0] || '', parts.slice(1).join(' ') || '', vol['TELEFONO'] || '', '', vol['SEZIONE'] || '');
+              row.push(
+                vol['NOME_COGNOME'] || '',  // NOME: campo intero, nessun split
+                '',                          // COGNOME: sempre vuoto
+                vol['TELEFONO']    || '',
+                '',                          // MAIL: sempre vuota
+                vol['SEZIONE']     || ''
+              );
             } else {
               row.push('', '', '', '', '');
             }
@@ -2865,10 +2889,10 @@ async function scaricaTabellaPresidio(btn) {
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws['!cols'] = [
-        {wch:8}, {wch:22},
+        {wch:8}, {wch:24},
         ...Array(20).fill(null).map((_, i) => {
           const c = i % 5;
-          return c===0?{wch:14}:c===1?{wch:20}:c===2?{wch:14}:c===3?{wch:25}:{wch:18};
+          return c === 0 ? {wch:28} : c === 1 ? {wch:4} : c === 2 ? {wch:14} : c === 3 ? {wch:4} : {wch:20};
         })
       ];
       XLSX.utils.book_append_sheet(wb, ws, g.sheetName);
