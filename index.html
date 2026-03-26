@@ -2800,102 +2800,91 @@ async function scaricaTabellaPresidio(btn) {
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generazione...'; }
 
   try {
-    // ── 1. Carica dati da Supabase ──────────────────────────────
-    const [{ data: turni, error: e1 }, { data: varchi, error: e2 }, { data: volontari, error: e3 }] = await Promise.all([
-      sb.from('TURNI').select('*'),
+    // ── 1. Query: varchi ordinati, tutti i volontari JOLLY=false ──
+    const [{ data: varchi, error: eV }, { data: volontari, error: eW }] = await Promise.all([
       sb.from('VARCHI').select('VARCO, SEZIONI').order('VARCO', { ascending: true }),
-      sb.from('VOLONTARI').select('id, NOME_COGNOME, TELEFONO, SEZIONE, TURNO, VARCO').eq('JOLLY', false).order('id', { ascending: true })
+      sb.from('VOLONTARI').select('id, NOME_COGNOME, TELEFONO, SEZIONE, TURNO, VARCO')
+        .eq('JOLLY', false).order('id', { ascending: true })
     ]);
-    if (e1) throw new Error('TURNI: ' + e1.message);
-    if (e2) throw new Error('VARCHI: ' + e2.message);
-    if (e3) throw new Error('VOLONTARI: ' + e3.message);
+    if (eV) throw new Error('VARCHI: ' + eV.message);
+    if (eW) throw new Error('VOLONTARI: ' + eW.message);
 
-    // ── 2. Intestazione: 2 colonne fisse + 5 × 4 turni = 22 colonne ──
-    const T_LABELS = ['I\u00b0T', 'II\u00b0T', 'III\u00b0T', 'IV\u00b0T'];
-    const header = ['N.VARCO', 'POSIZIONE'];
-    for (const tl of T_LABELS) {
-      header.push(`${tl}-NOME`, `${tl}-COGNOME`, `${tl}-TELEFONO`, `${tl}-MAIL`, `${tl}-GRUPPO`);
+    // ── 2. Mappa precalcolata: "TURNO X" → varcoNum → [vol1, vol2] ──
+    // Valori VARCO nel DB sono numeri; convertiamo in stringa per chiave
+    const mapVol = {};          // mapVol["TURNO 1"]["5"] = [volA, volB]
+    for (const v of (volontari || [])) {
+      const turnoKey = v['TURNO'];
+      const varcoKey = String(v['VARCO']);
+      if (!turnoKey || !varcoKey || varcoKey === 'null') continue;
+      if (!mapVol[turnoKey]) mapVol[turnoKey] = {};
+      if (!mapVol[turnoKey][varcoKey]) mapVol[turnoKey][varcoKey] = [];
+      if (mapVol[turnoKey][varcoKey].length < 2) mapVol[turnoKey][varcoKey].push(v);
     }
 
-    // ── 3. Fogli per giorno ─────────────────────────────────────
-    const giorniConfig = [
-      { sheetName: 'VENERDI',  giornoKey: 'VENERDI'  },
-      { sheetName: 'SABATO',   giornoKey: 'SABATO'   },
-      { sheetName: 'DOMENICA', giornoKey: 'DOMENICA' }
+    // ── 3. Helper: estrai celle per un volontario (o vuoto) ──────
+    function celleVol(vol) {
+      if (!vol) return ['', '', '', '', ''];
+      return [
+        vol['NOME_COGNOME'] || '',   // NOME (campo intero, nessun split)
+        '',                           // COGNOME (sempre vuoto)
+        vol['TELEFONO']     || '',
+        '',                           // MAIL (sempre vuota)
+        vol['SEZIONE']      || ''    // GRUPPO
+      ];
+    }
+
+    // ── 4. Intestazione 22 colonne ──────────────────────────────
+    const header = [
+      'N.VARCO', 'POSIZIONE',
+      'I°T-NOME',   'I°T-COGNOME',   'I°T-TELEFONO',   'I°T-MAIL',   'I°T-GRUPPO',
+      'II°T-NOME',  'II°T-COGNOME',  'II°T-TELEFONO',  'II°T-MAIL',  'II°T-GRUPPO',
+      'III°T-NOME', 'III°T-COGNOME', 'III°T-TELEFONO', 'III°T-MAIL', 'III°T-GRUPPO',
+      'IV°T-NOME',  'IV°T-COGNOME',  'IV°T-TELEFONO',  'IV°T-MAIL',  'IV°T-GRUPPO'
+    ];
+
+    // ── 5. Configurazione fogli ─────────────────────────────────
+    // Turni certi dal DB: "TURNO 1"-"TURNO 4" = VENERDI, "TURNO 5"-"TURNO 8" = SABATO
+    const fogli = [
+      { sheetName: 'VENERDI', turni: ['TURNO 1', 'TURNO 2', 'TURNO 3', 'TURNO 4'] },
+      { sheetName: 'SABATO',  turni: ['TURNO 5', 'TURNO 6', 'TURNO 7', 'TURNO 8'] }
     ];
 
     const wb = XLSX.utils.book_new();
 
-    for (const g of giorniConfig) {
-      // Turni del giorno, ordinati per numero progressivo dell'Etichetta
-      // (es. "TURNO 1" < "TURNO 2"). NON si usa FASCIA ORARIA perché
-      // il turno notturno "23:00" sarebbe ordinato dopo "18:00".
-      const turniGiorno = (turni || [])
-        .filter(t => (t['GIORNO'] || '').trim().toUpperCase() === g.giornoKey)
-        .sort((a, b) => {
-          const nA = parseInt((a['Etichetta'] || '').replace(/\D/g, ''), 10) || 0;
-          const nB = parseInt((b['Etichetta'] || '').replace(/\D/g, ''), 10) || 0;
-          return nA - nB;
-        });
-
-      // I°=idx0, II°=idx1, III°=idx2, IV°=idx3  (null se non esiste)
-      const etichette = [0, 1, 2, 3].map(i => (turniGiorno[i] || {})['Etichetta'] || null);
-
-      // Precalcola mappa turno → varco → [vol1, vol2] per performance
-      const mapVol = {};
-      for (const et of etichette) {
-        if (!et) continue;
-        mapVol[et] = {};
-        const volsInTurno = (volontari || []).filter(v => v['TURNO'] === et);
-        for (const v of volsInTurno) {
-          const vk = String(v['VARCO']);
-          if (!mapVol[et][vk]) mapVol[et][vk] = [];
-          if (mapVol[et][vk].length < 2) mapVol[et][vk].push(v);
-        }
-      }
-
+    for (const foglio of fogli) {
+      const [t1, t2, t3, t4] = foglio.turni;   // etichette I°…IV° turno
       const rows = [header];
 
       for (const varco of (varchi || [])) {
         const vNum = varco['VARCO'];
         const vKey = String(vNum);
-        const posizione = varco['SEZIONI'] || '';
+        const pos  = varco['SEZIONI'] || '';
 
-        for (let slot = 0; slot < 2; slot++) {
-          const row = [
-            slot === 0 ? vNum : '',
-            slot === 0 ? posizione : ''
-          ];
-          for (let ti = 0; ti < 4; ti++) {
-            const et = etichette[ti];
-            if (!et) { row.push('', '', '', '', ''); continue; }
-            const vols = (mapVol[et] && mapVol[et][vKey]) ? mapVol[et][vKey] : [];
-            const vol  = vols[slot] || null;
-            if (vol) {
-              row.push(
-                vol['NOME_COGNOME'] || '',  // NOME: campo intero, nessun split
-                '',                          // COGNOME: sempre vuoto
-                vol['TELEFONO']    || '',
-                '',                          // MAIL: sempre vuota
-                vol['SEZIONE']     || ''
-              );
-            } else {
-              row.push('', '', '', '', '');
-            }
-          }
-          rows.push(row);
-        }
+        // Slot 0 e 1 per ogni turno
+        const v1 = { t1: (mapVol[t1]?.[vKey] || [])[0] || null,
+                     t2: (mapVol[t2]?.[vKey] || [])[0] || null,
+                     t3: (mapVol[t3]?.[vKey] || [])[0] || null,
+                     t4: (mapVol[t4]?.[vKey] || [])[0] || null };
+        const v2 = { t1: (mapVol[t1]?.[vKey] || [])[1] || null,
+                     t2: (mapVol[t2]?.[vKey] || [])[1] || null,
+                     t3: (mapVol[t3]?.[vKey] || [])[1] || null,
+                     t4: (mapVol[t4]?.[vKey] || [])[1] || null };
+
+        // Riga slot 1
+        rows.push([vNum, pos, ...celleVol(v1.t1), ...celleVol(v1.t2), ...celleVol(v1.t3), ...celleVol(v1.t4)]);
+        // Riga slot 2
+        rows.push(['',   '',  ...celleVol(v2.t1), ...celleVol(v2.t2), ...celleVol(v2.t3), ...celleVol(v2.t4)]);
       }
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws['!cols'] = [
-        {wch:8}, {wch:24},
-        ...Array(20).fill(null).map((_, i) => {
-          const c = i % 5;
-          return c === 0 ? {wch:28} : c === 1 ? {wch:4} : c === 2 ? {wch:14} : c === 3 ? {wch:4} : {wch:20};
-        })
+        {wch:8}, {wch:24},                          // N.VARCO, POSIZIONE
+        {wch:30},{wch:4},{wch:14},{wch:4},{wch:20}, // I° turno
+        {wch:30},{wch:4},{wch:14},{wch:4},{wch:20}, // II° turno
+        {wch:30},{wch:4},{wch:14},{wch:4},{wch:20}, // III° turno
+        {wch:30},{wch:4},{wch:14},{wch:4},{wch:20}  // IV° turno
       ];
-      XLSX.utils.book_append_sheet(wb, ws, g.sheetName);
+      XLSX.utils.book_append_sheet(wb, ws, foglio.sheetName);
     }
 
     XLSX.writeFile(wb, 'TABELLA_PRESIDIO_2026.xlsx');
