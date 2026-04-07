@@ -1890,6 +1890,18 @@ function renderTurnoAttivo() {
     return { principali: tutti.slice(0, 2), extra: tutti.slice(2) };
   }
 
+  // Restituisce true se il volontario deve mostrare il badge EXTRA:
+  // - JOLLY=true, oppure
+  // - il suo VARCO non corrisponde al varco della sua SEZIONE in tabella VARCHI
+  function volMostraExtra(vol) {
+    if (vol['JOLLY']) return true;
+    const varcoSez = _varchi.find(vx =>
+      (vx['SEZIONI'] || '').toLowerCase() === (vol['SEZIONE'] || '').toLowerCase()
+    );
+    if (!varcoSez) return true;
+    return vol['VARCO'] != varcoSez['VARCO'];
+  }
+
   // Logica posizionale mezzi: primo mezzo per varco = principale, dal 2° = extra
   function splitMezziVarco(varcoNum) {
     let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
@@ -1940,13 +1952,16 @@ function renderTurnoAttivo() {
       statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
 
     const chipsP = principali.map(vol => {
-      const classes = 'vol-chip-table' + (isSez ? ' readonly' : '');
+      const isExtra = volMostraExtra(vol);
+      const classes = 'vol-chip-table' + (isSez ? ' readonly' : '') + (isExtra ? ' extra' : '');
       const drag = isSez ? '' : `draggable="true" ondragstart="dragStart(event,'vol',${vol.id})"`;
       const removeBtn = isSez ? '' : `<button class="vc-remove" onclick="rimuoviVol(${vol.id})" title="Rimuovi dal varco">✕</button>`;
+      const extraBadge = isExtra ? '<div class="vc-badge-extra">EXTRA</div>' : '';
       return `<div class="${classes}" ${drag}>
         <div class="vc-nome">${vol['NOME_COGNOME']}</div>
         <div class="vc-sez">Sez: ${vol['SEZIONE'] || '—'}</div>
         <div class="vc-tel">${vol['TELEFONO'] ? `<a href="tel:${vol['TELEFONO'].replace(/\s/g,'')}" style="color:inherit;text-decoration:none">${vol['TELEFONO']}</a>` : ''}</div>
+        ${extraBadge}
         ${removeBtn}
       </div>`;
     }).join('');
@@ -2433,8 +2448,8 @@ async function salvaVolontari() {
   const sezione = CU['SEZIONE'];
   if (!sezione) { showFormAlert('ins-alert', 'Account senza sezione assegnata', 'err'); return; }
 
-  // Trova il varco della sezione
-  const { data: varcoData } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).single();
+  // Trova il varco della sezione (case-insensitive)
+  const { data: varcoData } = await sb.from('VARCHI').select('VARCO').ilike('SEZIONI', sezione).maybeSingle();
   const varcoNum = varcoData ? varcoData['VARCO'] : null;
 
   setLoading(true);
@@ -2443,12 +2458,27 @@ async function salvaVolontari() {
     let totJolly = 0;
 
     for (const [turno, vols] of Object.entries(_insData)) {
+      // Conta i volontari già esistenti nel DB per VARCO+TURNO
+      // (esclude quelli del batch corrente che hanno già un ID)
+      let baseCount = 0;
+      if (varcoNum !== null) {
+        const idsEsistenti = vols.filter(v => v.id).map(v => v.id);
+        let q = sb.from('VOLONTARI').select('id', { count: 'exact', head: true })
+          .eq('VARCO', varcoNum).eq('TURNO', turno);
+        if (idsEsistenti.length > 0) {
+          q = q.not('id', 'in', `(${idsEsistenti.join(',')})`);
+        }
+        const { count } = await q;
+        baseCount = count || 0;
+      }
+      let contatore = baseCount;
+
       for (let i = 0; i < vols.length; i++) {
         const v = vols[i];
         if (!v.nome.trim()) continue; // salta righe vuote
 
-        const isJolly = i >= 2; // dal 3° in poi è jolly
-        const varcoAssegnato = isJolly ? null : varcoNum;
+        const isJolly = varcoNum === null || contatore >= 2;
+        contatore++;
 
         const row = {
           'NOME_COGNOME':   v.nome.trim().toUpperCase(),
@@ -2457,7 +2487,7 @@ async function salvaVolontari() {
           'NON_PC':         v.nonpc || false,
           'SEZIONE':        sezione,
           'TURNO':          turno,
-          'VARCO':          varcoAssegnato,
+          'VARCO':          varcoNum,
           'JOLLY':          isJolly,
         };
 
@@ -3271,20 +3301,23 @@ async function importaExcel(input) {
       return;
     }
 
-    // Recupera varco della sezione
+    // Recupera varco della sezione (case-insensitive)
     const sezione = CU['SEZIONE'];
-    const varcoSezione = _varchi.find(v => v['SEZIONI'] === sezione);
-    if (!varcoSezione) {
-      showFormAlert('import-alert', 'Sezione non trovata nei varchi.', 'err');
-      return;
-    }
+    const varcoSezione = _varchi.find(v =>
+      (v['SEZIONI'] || '').toLowerCase() === (sezione || '').toLowerCase()
+    );
+    const varcoNum = varcoSezione ? varcoSezione['VARCO'] : null;
 
-    // Conta quanti volontari ci sono già per ogni turno in questa sezione
+    // Conta quanti volontari ci sono già per ogni turno su quel VARCO
     const contatoriTurno = {};
     _turni.forEach(t => {
-      contatoriTurno[t['Etichetta']] = _volontari.filter(v =>
-        v['SEZIONE'] === sezione && v['TURNO'] === t['Etichetta']
-      ).length;
+      if (varcoNum !== null) {
+        contatoriTurno[t['Etichetta']] = _volontari.filter(v =>
+          v['VARCO'] == varcoNum && v['TURNO'] === t['Etichetta']
+        ).length;
+      } else {
+        contatoriTurno[t['Etichetta']] = 0;
+      }
     });
 
     // Prepara inserimenti
@@ -3304,9 +3337,9 @@ async function importaExcel(input) {
       const turnoValido = _turni.find(t => t['Etichetta'].toUpperCase() === turno);
       if (!turnoValido) { errori++; continue; }
 
-      // Determina se jolly (extra) in base alla posizione
+      // Determina se jolly in base alla posizione su VARCO+TURNO
       const posizione = (contatoriTurno[turnoValido['Etichetta']] || 0);
-      const isJolly   = posizione >= 2;
+      const isJolly   = varcoNum === null || posizione >= 2;
       contatoriTurno[turnoValido['Etichetta']] = posizione + 1;
 
       records.push({
@@ -3315,7 +3348,7 @@ async function importaExcel(input) {
         TELEFONO:        tel,
         TURNO:           turnoValido['Etichetta'],
         SEZIONE:         sezione,
-        VARCO:           varcoSezione['VARCO'],
+        VARCO:           varcoNum,
         JOLLY:           isJolly,
         NON_PC:          nonpc,
       });
