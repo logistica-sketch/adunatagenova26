@@ -1206,6 +1206,16 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         <div class="page-title">Inserimento Volontari <small id="ins-sezione-label">Sezione: —</small></div>
       </div>
 
+      <!-- Selettore sezione (solo FULL) -->
+      <div id="ins-sezione-wrap" style="display:none;margin-bottom:16px">
+        <div class="field-group" style="max-width:340px;margin:0">
+          <label>Sezione *</label>
+          <select id="ins-sezione-sel" onchange="cambiaSezioneInserimento()">
+            <option value="">Seleziona una sezione</option>
+          </select>
+        </div>
+      </div>
+
       <!-- INFO BOX -->
       <div style="background:var(--verde-light);border:1px solid #b4ddbf;border-radius:var(--r);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--verde);">
         <strong>Come funziona:</strong> Inserisci i volontari per ogni turno. I primi 2 per turno vengono assegnati automaticamente al varco della tua sezione. I volontari aggiuntivi diventano <strong>jolly</strong> e possono essere spostati su altri varchi dalla pagina Gestione Turni.
@@ -2365,11 +2375,38 @@ async function deleteUtente(id, username) {
 // Struttura dati form: { [etichettaTurno]: [ {nome, cf, tel, nonpc}, ... ] }
 let _insData = {};
 
+function cambiaSezioneInserimento() {
+  _insData = {};
+  renderInserimento();
+}
+
 async function renderInserimento() {
   setLoading(true);
   try {
-    const sezione = CU['SEZIONE'];
+    const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+    await loadSezioniList();
+
+    let sezione;
+    if (isFull) {
+      const wrap = document.getElementById('ins-sezione-wrap');
+      wrap.style.display = '';
+      const sel = document.getElementById('ins-sezione-sel');
+      if (sel.options.length <= 1) {
+        sel.innerHTML = '<option value="">Seleziona una sezione</option>' +
+          _sezioniList.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+      sezione = sel.value;
+    } else {
+      document.getElementById('ins-sezione-wrap').style.display = 'none';
+      sezione = CU['SEZIONE'];
+    }
+
     document.getElementById('ins-sezione-label').textContent = 'Sezione: ' + (sezione || '—');
+
+    if (!sezione) {
+      document.getElementById('ins-turni-container').innerHTML = '<div class="empty-state"><div class="ei">👆</div><p>Seleziona una sezione per iniziare.</p></div>';
+      return;
+    }
 
     const { data: turni } = await sb.from('TURNI').select('*').order('Etichetta');
     if (!turni || !turni.length) {
@@ -2510,8 +2547,9 @@ function updateVol(turno, idx, field, val) {
 }
 
 async function salvaVolontari() {
-  const sezione = CU['SEZIONE'];
-  if (!sezione) { showFormAlert('ins-alert', 'Account senza sezione assegnata', 'err'); return; }
+  const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+  const sezione = isFull ? document.getElementById('ins-sezione-sel').value : CU['SEZIONE'];
+  if (!sezione) { showFormAlert('ins-alert', isFull ? 'Seleziona una sezione' : 'Account senza sezione assegnata', 'err'); return; }
 
   // Trova il varco della sezione (case-insensitive)
   const { data: varcoData } = await sb.from('VARCHI').select('VARCO').ilike('SEZIONI', sezione).maybeSingle();
