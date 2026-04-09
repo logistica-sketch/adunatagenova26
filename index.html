@@ -1769,7 +1769,10 @@ async function renderSezioni() {
     if (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE') {
       sezioni = [CU['SEZIONE']].filter(Boolean);
     } else {
-      sezioni = [...new Set((varchi||[]).map(v => v['SEZIONI']).filter(Boolean))].sort();
+      await loadSezioniList();
+      const daVarchi = (varchi||[]).map(v => v['SEZIONI']).filter(Boolean);
+      const daVol    = (volontari||[]).map(v => v['SEZIONE']).filter(Boolean);
+      sezioni = [...new Set([..._sezioniList, ...daVarchi, ...daVol])].sort();
     }
 
     const container = document.getElementById('sezioni-accordion');
