@@ -1380,6 +1380,27 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
           </div>
         </div>
       </div>
+
+      <!-- GESTIONE SEZIONI (solo FULL) -->
+      <div id="sezioni-manager-wrap" style="display:none;margin-top:24px">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Gestione Sezioni</span>
+            <div style="font-size:12px;color:var(--testo3)">Aggiungi o rimuovi le sezioni disponibili nell'applicazione</div>
+          </div>
+          <div class="panel-body">
+            <div style="display:flex;gap:10px;margin-bottom:16px;align-items:flex-end">
+              <div class="field-group" style="flex:1;margin:0">
+                <label>Nome Sezione</label>
+                <input type="text" id="nuova-sezione-input" placeholder="Es. TORINO" style="text-transform:uppercase" onkeydown="if(event.key==='Enter')aggiungiSezione()">
+              </div>
+              <button class="btn btn-primary" onclick="aggiungiSezione()" style="height:40px;white-space:nowrap;flex-shrink:0">+ Aggiungi</button>
+            </div>
+            <div class="form-alert" id="sezioni-alert" style="margin-bottom:12px"></div>
+            <div id="sezioni-lista"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -2519,7 +2540,13 @@ async function salvaVolontari() {
 // ══════════════════════════════════════════════════════════════
 //  INSERIMENTO MEZZI
 // ══════════════════════════════════════════════════════════════
-const SEZIONI_LIST = ['ACQUI TERME','ALESSANDRIA','AOSTA','ASTI','BIELLA','CASALE MONFERRATO','CEVA','CUNEO','DOMODOSSOLA','GENOVA','IMPERIA','INTRA','IVREA','LA SPEZIA','MONDOVI','NOVARA','OMEGNA','PINEROLO','SALUZZO','SAVONA','TORINO','VALSESIANA','VALSUSA','VERCELLI'];
+let _sezioniList = [];
+
+async function loadSezioniList(force = false) {
+  if (_sezioniList.length && !force) return;
+  const { data } = await sb.from('SEZIONI').select('SEZIONE').order('SEZIONE');
+  _sezioniList = (data || []).map(r => r['SEZIONE']);
+}
 
 async function renderInserimentoMezzi() {
   const sezione = CU['SEZIONE'];
@@ -2548,10 +2575,11 @@ async function renderInserimentoMezzi() {
       </label>`).join('');
 
     // Popola sezioni nel form (solo full può scegliere)
+    await loadSezioniList();
     const selSez = document.getElementById('mezzo-sezione');
     if (isFull) {
       selSez.innerHTML = '<option value="">Seleziona una sezione</option>' +
-        SEZIONI_LIST.map(s => `<option value="${s}">${s}</option>`).join('');
+        _sezioniList.map(s => `<option value="${s}">${s}</option>`).join('');
       document.getElementById('mezzo-sezione-wrap').style.display = '';
     } else {
       selSez.innerHTML = `<option value="${sezione}" selected>${sezione}</option>`;
@@ -3397,8 +3425,7 @@ async function renderUtility() {
     document.getElementById('guida-textarea').value = testo;
     document.getElementById('guida-edit-btn').style.display = isFull ? '' : 'none';
 
-    const { data: varchi } = await sb.from('VARCHI').select('SEZIONI').order('SEZIONI');
-    const sezioni = [...new Set((varchi||[]).map(v => v['SEZIONI']).filter(Boolean))].sort();
+    await loadSezioniList(true);
     const selSez = document.getElementById('segn-sezione');
     if (!isFull && CU['SEZIONE']) {
       selSez.innerHTML = `<option value="${CU['SEZIONE']}" selected>${CU['SEZIONE']}</option>`;
@@ -3406,12 +3433,14 @@ async function renderUtility() {
     } else {
       selSez.disabled = false;
       selSez.innerHTML = '<option value="">Seleziona una sezione</option>' +
-        sezioni.map(s => `<option value="${s}">${s}</option>`).join('');
+        _sezioniList.map(s => `<option value="${s}">${s}</option>`).join('');
     }
-    document.getElementById('segn-sezioni-count').textContent = sezioni.length + ' sezioni caricate';
+    document.getElementById('segn-sezioni-count').textContent = _sezioniList.length + ' sezioni caricate';
 
     if (isFull) {
       document.getElementById('segn-lista-wrap').style.display = '';
+      document.getElementById('sezioni-manager-wrap').style.display = '';
+      renderSezioniManager();
       const { data: segn } = await sb.from('SEGNALAZIONI').select('*').order('created_at', { ascending: false });
       const tbody = document.getElementById('segn-tbody');
       if (!segn || !segn.length) {
@@ -3435,8 +3464,55 @@ async function renderUtility() {
       }
     } else {
       document.getElementById('segn-lista-wrap').style.display = 'none';
+      document.getElementById('sezioni-manager-wrap').style.display = 'none';
     }
   } catch(e) { console.error(e); }
+  finally { setLoading(false); }
+}
+
+function renderSezioniManager() {
+  const lista = document.getElementById('sezioni-lista');
+  if (!_sezioniList.length) {
+    lista.innerHTML = '<div style="color:var(--testo3);font-size:13px;padding:8px 0">Nessuna sezione presente.</div>';
+    return;
+  }
+  lista.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">` +
+    _sezioniList.map(s =>
+      `<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px 6px 12px;font-size:13px;font-weight:600;color:var(--testo)">
+        ${s}
+        <button onclick="eliminaSezione('${s.replace(/'/g,"\\'")}');" title="Elimina" style="background:none;border:none;cursor:pointer;color:var(--rosso);font-size:18px;line-height:1;padding:0 2px;margin-left:2px">×</button>
+      </div>`
+    ).join('') +
+  `</div>`;
+}
+
+async function aggiungiSezione() {
+  const input = document.getElementById('nuova-sezione-input');
+  const nome = input.value.trim().toUpperCase();
+  if (!nome) { showFormAlert('sezioni-alert', 'Inserisci il nome della sezione', 'err'); return; }
+  if (_sezioniList.includes(nome)) { showFormAlert('sezioni-alert', 'Sezione già presente', 'err'); return; }
+  setLoading(true);
+  try {
+    const { error } = await sb.from('SEZIONI').insert({ SEZIONE: nome });
+    if (error) throw error;
+    input.value = '';
+    await loadSezioniList(true);
+    renderSezioniManager();
+    showFormAlert('sezioni-alert', `✅ Sezione "${nome}" aggiunta!`, 'ok');
+  } catch(e) { showFormAlert('sezioni-alert', 'Errore: ' + e.message, 'err'); }
+  finally { setLoading(false); }
+}
+
+async function eliminaSezione(nome) {
+  if (!confirm(`Eliminare la sezione "${nome}"?`)) return;
+  setLoading(true);
+  try {
+    const { error } = await sb.from('SEZIONI').delete().eq('SEZIONE', nome);
+    if (error) throw error;
+    await loadSezioniList(true);
+    renderSezioniManager();
+    showFormAlert('sezioni-alert', `✅ Sezione "${nome}" eliminata.`, 'ok');
+  } catch(e) { showFormAlert('sezioni-alert', 'Errore: ' + e.message, 'err'); }
   finally { setLoading(false); }
 }
 
