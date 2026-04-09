@@ -254,6 +254,12 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
 .td-mezzo{min-width:180px;}
 .td-stato{width:100px;text-align:center;}
 
+/* POOL JOLLY */
+.pool-jolly-box{background:var(--arancio-light);border:1px solid #f5d9a0;border-radius:var(--r);padding:16px 20px;}
+.pool-jolly-header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+.pool-jolly-title{font-size:13px;font-weight:700;color:var(--arancio);}
+.pool-jolly-sub{font-size:12px;color:#a07020;}
+
 /* CHIP VOLONTARIO in tabella */
 .vol-chip-table{display:inline-flex;flex-direction:column;background:var(--verde-light);border:1px solid #b4ddbf;border-radius:6px;padding:7px 10px;margin:3px;min-width:130px;cursor:grab;position:relative;transition:box-shadow 0.15s;}
 .vol-chip-table:hover{box-shadow:0 2px 8px rgba(26,110,46,0.15);}
@@ -736,6 +742,12 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
 .td-mezzo{min-width:180px;}
 .td-stato{width:100px;text-align:center;}
 
+/* POOL JOLLY */
+.pool-jolly-box{background:var(--arancio-light);border:1px solid #f5d9a0;border-radius:var(--r);padding:16px 20px;}
+.pool-jolly-header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+.pool-jolly-title{font-size:13px;font-weight:700;color:var(--arancio);}
+.pool-jolly-sub{font-size:12px;color:#a07020;}
+
 /* CHIP VOLONTARIO in tabella */
 .vol-chip-table{display:inline-flex;flex-direction:column;background:var(--verde-light);border:1px solid #b4ddbf;border-radius:6px;padding:7px 10px;margin:3px;min-width:130px;cursor:grab;position:relative;transition:box-shadow 0.15s;}
 .vol-chip-table:hover{box-shadow:0 2px 8px rgba(26,110,46,0.15);}
@@ -1129,6 +1141,17 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
           </thead>
           <tbody id="varchi-tbody"></tbody>
         </table>
+      </div>
+
+      <!-- Pool volontari non assegnati -->
+      <div id="pool-jolly-wrap" style="display:none;margin-top:20px">
+        <div class="pool-jolly-box">
+          <div class="pool-jolly-header">
+            <span class="pool-jolly-title">Volontari disponibili non assegnati</span>
+            <span class="pool-jolly-sub">Trascina su un varco per assegnarli</span>
+          </div>
+          <div id="pool-jolly-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
+        </div>
       </div>
     </div>
 
@@ -2048,6 +2071,27 @@ function renderTurnoAttivo() {
       <td class="td-stato">${statoHtml}</td>
     </tr>`;
   }).join('');
+
+  // Pool: volontari del turno senza varco (solo admin FULL)
+  const poolWrap = document.getElementById('pool-jolly-wrap');
+  if (!isSez) {
+    const pool = volTurno.filter(v => !v['VARCO']);
+    if (pool.length) {
+      poolWrap.style.display = '';
+      document.getElementById('pool-jolly-chips').innerHTML = pool.map(vol =>
+        `<div class="vol-chip-table extra" draggable="true" ondragstart="dragStart(event,'vol',${vol.id})">
+          <div class="vc-nome">${vol['NOME_COGNOME']}</div>
+          <div class="vc-sez">Sez: ${vol['SEZIONE'] || '—'}</div>
+          ${vol['TELEFONO'] ? `<div class="vc-tel"><a href="tel:${vol['TELEFONO'].replace(/\s/g,'')}" style="color:inherit;text-decoration:none">${vol['TELEFONO']}</a></div>` : ''}
+          <div class="vc-badge-extra">JOLLY</div>
+        </div>`
+      ).join('');
+    } else {
+      poolWrap.style.display = 'none';
+    }
+  } else {
+    poolWrap.style.display = 'none';
+  }
 }
 
 // ── DRAG & DROP ───────────────────────────────────────────────
