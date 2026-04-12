@@ -1802,7 +1802,7 @@ async function renderSezioni() {
           </div>
           <div class="vli-actions">
             <button class="btn btn-ghost btn-sm" onclick="openEditVolontario(${v.id})">✏️ Modifica</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteVolontario(${v.id},'${v['NOME_COGNOME'].replace(/'/g,"\'")}')">✕</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteVolontario(${v.id})">✕</button>
           </div>
         </div>`;
       }).join('') : '<div style="padding:20px;color:var(--testo3);font-size:13px">Nessun volontario registrato.</div>';
@@ -1860,7 +1860,9 @@ function switchSezTab(sezId, tab) {
   document.getElementById('tab-mez-' + sezId).className = 'sez-tab' + (tab==='mez'?' active':'');
 }
 
-async function deleteVolontario(id, nome) {
+async function deleteVolontario(id) {
+  const _vol = _volontari.find(v => v.id === id);
+  const nome = _vol ? _vol['NOME_COGNOME'] : '';
   if (!confirm(`Eliminare il volontario "${nome}"?`)) return;
   setLoading(true);
   try {
