@@ -2629,8 +2629,8 @@ let _sezioniList = [];
 
 async function loadSezioniList(force = false) {
   if (_sezioniList.length && !force) return;
-  const { data } = await sb.from('SEZIONI').select('SEZIONE').order('SEZIONE');
-  _sezioniList = (data || []).map(r => r['SEZIONE']);
+  const { data } = await sb.from('VARCHI').select('SEZIONI').order('SEZIONI');
+  _sezioniList = [...new Set((data || []).map(r => r['SEZIONI']).filter(Boolean))].sort();
 }
 
 async function renderInserimentoMezzi() {
