@@ -1414,6 +1414,25 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         </div>
       </div>
 
+      <!-- GESTIONE MODALITÀ UTENTI (solo FULL) -->
+      <div id="utenti-mode-wrap" style="display:none;margin-top:24px">
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <span class="panel-title">Modalità Accesso Sezionale</span>
+              <div style="font-size:12px;color:var(--testo3);margin-top:2px">Configura la modalità di accesso per ogni utente sezionale</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="renderUtentiMode()">↻ Aggiorna</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Username</th><th>Sezione</th><th>Modalità</th></tr></thead>
+              <tbody id="utenti-mode-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- GESTIONE SEZIONI (solo FULL) -->
       <div id="sezioni-manager-wrap" style="display:none;margin-top:24px">
         <div class="panel">
@@ -1452,7 +1471,8 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
       <div class="field-group"><label>Password *</label><input type="password" id="utente-pass" placeholder="Lascia vuoto per non modificare"></div>
       <div class="field-group"><label>Tipologia accesso *</label>
         <select id="utente-tipo" onchange="toggleSezione()">
-          <option value="ACCESSO SEZIONALE">Accesso Sezionale</option>
+          <option value="ACCESSO SEZIONALE">Accesso Sezionale (Standard)</option>
+          <option value="ACCESSO SEZIONALE_RO">Accesso Sezionale (Sola Lettura)</option>
           <option value="ACCESSO FULL">Accesso Full (Admin)</option>
         </select>
       </div>
@@ -1533,6 +1553,7 @@ function togglePw() {
 // ── NAVBAR DINAMICA ───────────────────────────────────────────
 function buildNavbar() {
   const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+  const isRO   = CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO';
   const navbar = document.getElementById('navbar-full');
 
   const tabsFull = [
@@ -1542,6 +1563,7 @@ function buildNavbar() {
     { id:'varchi',      label:'Varchi' },
     { id:'inserimento', label:'Inserimento Volontari' },
     { id:'mezzi',       label:'Inserimento Mezzi' },
+    { id:'utenti',      label:'Utenti' },
     { id:'utility',     label:'Utility' },
   ];
 
@@ -1554,7 +1576,13 @@ function buildNavbar() {
     { id:'utility',     label:'Utility' },
   ];
 
-  const tabs = isFull ? tabsFull : tabsSez;
+  const tabsRO = [
+    { id:'griglia',     label:'Gestione Turni' },
+    { id:'varchi',      label:'Varchi' },
+    { id:'sezioni',     label:'I miei Volontari' },
+  ];
+
+  const tabs = isFull ? tabsFull : isRO ? tabsRO : tabsSez;
   navbar.innerHTML = tabs.map(t =>
     `<button class="nav-tab" data-tab="${t.id}" onclick="showTab('${t.id}')">${t.label}</button>`
   ).join('');
@@ -1582,7 +1610,7 @@ async function doLogin() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('topbar-name').textContent = data['Nome Utente'];
-    document.getElementById('topbar-role').textContent = data['TIPOLOGIA'] === 'ACCESSO FULL' ? 'Accesso completo' : 'Sezione: ' + (data['SEZIONE'] || '—');
+    document.getElementById('topbar-role').textContent = data['TIPOLOGIA'] === 'ACCESSO FULL' ? 'Accesso completo' : data['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO' ? 'Solo lettura · Sezione: ' + (data['SEZIONE'] || '—') : 'Sezione: ' + (data['SEZIONE'] || '—');
     buildNavbar();
     aggiornaDrawer();
     // Mostra AI FAB solo per ACCESSO FULL
@@ -1590,7 +1618,7 @@ async function doLogin() {
       document.getElementById('ai-fab').style.display = 'flex';
       document.getElementById('ai-fab').classList.add('pulse');
     }
-    showTab(CU['TIPOLOGIA'] === 'ACCESSO FULL' ? 'dashboard' : 'inserimento');
+    showTab(CU['TIPOLOGIA'] === 'ACCESSO FULL' ? 'dashboard' : CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO' ? 'griglia' : 'inserimento');
   } catch(e) { showLoginErr('Errore di connessione'); }
   finally { btn.textContent = 'Accedi →'; btn.disabled = false; setLoading(false); }
 }
@@ -1766,7 +1794,7 @@ async function renderSezioni() {
     _varchi = varchi || []; _volontari = volontari || []; _turni = turni || []; _mezzi = mezzi || [];
 
     let sezioni;
-    if (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE') {
+    if (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO') {
       sezioni = [CU['SEZIONE']].filter(Boolean);
     } else {
       await loadSezioniList();
@@ -1786,7 +1814,8 @@ async function renderSezioni() {
       const mezSez  = (mezzi||[]).filter(m => m['SEZIONE'] === sez);
       const totVol  = volSez.length;
       const totMez  = mezSez.length;
-      const isSezOpen = CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE';
+      const isSezOpen = CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO';
+      const isRO = CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO';
       const sezId = sez.replace(/[^a-zA-Z0-9]/g,'_');
 
       // Lista volontari
@@ -1800,10 +1829,10 @@ async function renderSezioni() {
             <div class="vli-tel">CF: <span style="font-family:'Geist Mono',monospace;letter-spacing:0.5px">${v['CODICE_FISCALE']||'—'}</span></div>
             <div class="vli-tel">Telefono: ${v['TELEFONO'] ? `<a href="tel:${v['TELEFONO'].replace(/\s/g,'')}" style="color:inherit;text-decoration:none">${v['TELEFONO']}</a>` : '—'}</div>
           </div>
-          <div class="vli-actions">
+          ${isRO ? '' : `<div class="vli-actions">
             <button class="btn btn-ghost btn-sm" onclick="openEditVolontario(${v.id})">✏️ Modifica</button>
             <button class="btn btn-danger btn-sm" onclick="deleteVolontario(${v.id})">✕</button>
-          </div>
+          </div>`}
         </div>`;
       }).join('') : '<div style="padding:20px;color:var(--testo3);font-size:13px">Nessun volontario registrato.</div>';
 
@@ -1816,10 +1845,10 @@ async function renderSezioni() {
             <div class="mli-desc">${m['TIPOLOGIA']||''}</div>
             <div class="mli-turni">Turni: ${turniM.length ? turniM.join(', ') : '—'}</div>
           </div>
-          <div class="vli-actions">
+          ${isRO ? '' : `<div class="vli-actions">
             <button class="btn btn-ghost btn-sm" onclick="showTab('mezzi');setTimeout(()=>editMezzo(${m.id}),500)">✏️ Modifica</button>
             <button class="btn btn-danger btn-sm" onclick="deleteMezzoFromSez(${m.id},'${m['TARGA']}')">✕</button>
-          </div>
+          </div>`}
         </div>`;
       }).join('') : '<div style="padding:20px;color:var(--testo3);font-size:13px">Nessun mezzo registrato.</div>';
 
@@ -1905,7 +1934,7 @@ async function renderGriglia() {
     _mezziTurni = mezziTurni || [];
 
     // Aggiorna intestazione in base al tipo di accesso
-    const isSezGriglia = CU && CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE';
+    const isSezGriglia = CU && (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO');
     document.getElementById('griglia-readonly-banner').style.display = isSezGriglia ? '' : 'none';
     const pageSubtitle = document.querySelector('#tab-griglia .page-title small');
     if (pageSubtitle) pageSubtitle.textContent = isSezGriglia
@@ -1937,7 +1966,7 @@ function cambioTurno(et) {
 
 function renderTurnoAttivo() {
   const turno = _turnoAttivo;
-  const isSez = CU && CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE';
+  const isSez = CU && (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO');
   const miaSez = isSez ? (CU['SEZIONE'] || '') : null;
   const volTurno   = _volontari.filter(v => v['TURNO'] === turno);
   const mezziTurno = _mezziTurni.filter(mt => mt['TURNO'] === turno);
@@ -2301,7 +2330,7 @@ async function renderUtenti() {
         <td style="color:var(--testo3);font-size:12px">${String(i+1).padStart(2,'0')}</td>
         <td><strong>${u['Nome Utente']}</strong></td>
         <td>${u['SEZIONE'] ? `<span class="badge badge-grey">${u['SEZIONE']}</span>` : '<span style="color:var(--testo3)">—</span>'}</td>
-        <td>${u['TIPOLOGIA'] === 'ACCESSO FULL' ? '<span class="tag-full">⭐ Accesso Full</span>' : '<span class="tag-sez">Sezionale</span>'}</td>
+        <td>${u['TIPOLOGIA'] === 'ACCESSO FULL' ? '<span class="tag-full">⭐ Accesso Full</span>' : u['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO' ? '<span class="tag-sez" style="background:var(--arancio-light);color:var(--arancio)">👁 Sola lettura</span>' : '<span class="tag-sez">Sezionale</span>'}</td>
         <td style="white-space:nowrap">
           <button class="btn btn-ghost" onclick="editUtente('${u.id}')">Modifica</button>
           ${u['Nome Utente'] !== CU['Nome Utente']
@@ -2350,7 +2379,7 @@ async function saveUtente() {
   const id       = document.getElementById('utente-id').value;
   if (!username) { showFormAlert('utente-alert','Username obbligatorio','err'); return; }
   if (!id && !pass) { showFormAlert('utente-alert','Password obbligatoria','err'); return; }
-  if (tipo === 'ACCESSO SEZIONALE' && !sezione) { showFormAlert('utente-alert','Inserisci la sezione','err'); return; }
+  if (tipo !== 'ACCESSO FULL' && !sezione) { showFormAlert('utente-alert','Inserisci la sezione','err'); return; }
   const row = { 'Nome Utente': username, 'TIPOLOGIA': tipo, 'SEZIONE': tipo === 'ACCESSO FULL' ? null : sezione };
   if (pass) row['PASSWORD'] = pass;
   setLoading(true);
@@ -3552,7 +3581,9 @@ async function renderUtility() {
     if (isFull) {
       document.getElementById('segn-lista-wrap').style.display = '';
       document.getElementById('sezioni-manager-wrap').style.display = '';
+      document.getElementById('utenti-mode-wrap').style.display = '';
       renderSezioniManager();
+      renderUtentiMode();
       const { data: segn } = await sb.from('SEGNALAZIONI').select('*').order('created_at', { ascending: false });
       const tbody = document.getElementById('segn-tbody');
       if (!segn || !segn.length) {
@@ -3577,6 +3608,7 @@ async function renderUtility() {
     } else {
       document.getElementById('segn-lista-wrap').style.display = 'none';
       document.getElementById('sezioni-manager-wrap').style.display = 'none';
+      document.getElementById('utenti-mode-wrap').style.display = 'none';
     }
   } catch(e) { console.error(e); }
   finally { setLoading(false); }
@@ -3596,6 +3628,39 @@ function renderSezioniManager() {
       </div>`
     ).join('') +
   `</div>`;
+}
+
+async function renderUtentiMode() {
+  const tbody = document.getElementById('utenti-mode-tbody');
+  try {
+    const { data: utenti, error } = await sb.from('UTENTI')
+      .select('id, "Nome Utente", SEZIONE, TIPOLOGIA')
+      .in('TIPOLOGIA', ['ACCESSO SEZIONALE', 'ACCESSO SEZIONALE_RO'])
+      .order('Nome Utente');
+    if (error) throw error;
+    if (!utenti || !utenti.length) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--testo3);padding:20px">Nessun utente sezionale trovato</td></tr>';
+      return;
+    }
+    tbody.innerHTML = utenti.map(u => `
+      <tr>
+        <td><strong>${u['Nome Utente']}</strong></td>
+        <td>${u['SEZIONE'] ? `<span class="badge badge-grey">${u['SEZIONE']}</span>` : '—'}</td>
+        <td>
+          <select onchange="cambiaModalitaUtente('${u.id}', this.value)" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:4px">
+            <option value="ACCESSO SEZIONALE" ${u['TIPOLOGIA']==='ACCESSO SEZIONALE'?'selected':''}>Standard</option>
+            <option value="ACCESSO SEZIONALE_RO" ${u['TIPOLOGIA']==='ACCESSO SEZIONALE_RO'?'selected':''}>Sola lettura</option>
+          </select>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="3" style="color:var(--rosso);padding:12px">Errore: ${e.message}</td></tr>`; }
+}
+
+async function cambiaModalitaUtente(id, tipologia) {
+  try {
+    const { error } = await sb.from('UTENTI').update({ TIPOLOGIA: tipologia }).eq('id', id);
+    if (error) throw error;
+  } catch(e) { alert('Errore nel salvataggio: ' + e.message); }
 }
 
 async function aggiungiSezione() {
