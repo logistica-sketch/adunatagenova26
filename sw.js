@@ -1,4 +1,4 @@
-const CACHE_NAME = 'adunata-genova-2026-v1';
+const CACHE_NAME = 'adunata-genova-2026-v2';
 
 // Risorse statiche da mettere in cache al momento dell'installazione
 const STATIC_ASSETS = [

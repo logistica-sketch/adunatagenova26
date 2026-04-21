@@ -2294,7 +2294,9 @@ async function renderVarchi() {
       const indirizzo = v['INDIRIZZO'] ? `<span>${v['INDIRIZZO']}</span>` : `<span style="color:var(--testo3);font-style:italic">—</span>`;
       let posizioneHtml;
       if (v['POSIZIONE']) {
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v['POSIZIONE'])}`;
+        const pos = v['POSIZIONE'].trim();
+        console.log('POSIZIONE raw:', JSON.stringify(v['POSIZIONE']), '| test:', /^https?:\/\//i.test(pos));
+        const mapsUrl = /^https?:\/\//i.test(pos) ? pos : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pos)}`;
         posizioneHtml = `<a href="${mapsUrl}" target="_blank" rel="noopener" style="color:var(--verde);text-decoration:none;font-weight:600">📍 Vedi mappa</a>`;
       } else {
         posizioneHtml = `<span style="color:var(--testo3);font-style:italic">—</span>`;
