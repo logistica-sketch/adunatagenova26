@@ -1,32 +1,34 @@
-const CACHE_NAME = 'adunata-genova-2026-v2';
+const CACHE_NAME = 'adunata-genova-2026-v3';
 
-// Risorse statiche da mettere in cache al momento dell'installazione
 const STATIC_ASSETS = [
   '/',
   '/index.html'
 ];
 
-// Install: mette in cache le risorse statiche
+// Permette alla pagina di forzare l'attivazione del nuovo SW
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// Install: precache risorse statiche — NON chiama skipWaiting così il banner viene mostrato
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting();
 });
 
-// Activate: rimuove le vecchie cache
+// Activate: elimina tutte le cache vecchie e prende controllo subito
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
         keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: network-first per le API Supabase, cache-first per le risorse statiche
+// Fetch: network-first per index.html, cache-first per il resto
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -40,18 +42,38 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first per le risorse locali
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
+  const isHtmlRequest =
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    event.request.headers.get('accept')?.includes('text/html');
+
+  if (isHtmlRequest) {
+    // Network-first: prova sempre la rete, usa cache solo se offline
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const toCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+          }
           return response;
-        }
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
-        return response;
-      }).catch(() => caches.match('/index.html'));
-    })
-  );
+        })
+        .catch(() => caches.match('/index.html'))
+    );
+  } else {
+    // Cache-first per risorse statiche (CSS, JS, immagini)
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        if (cached) return cached;
+        return fetch(event.request).then(response => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          const toCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+          return response;
+        }).catch(() => caches.match('/index.html'));
+      })
+    );
+  }
 });

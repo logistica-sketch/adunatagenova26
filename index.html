@@ -1014,9 +1014,30 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
 .slot-vuoto-readonly { font-size:11px;color:var(--testo3);font-style:italic;padding:6px 8px;display:inline-block; }
 .nessun-mezzo-readonly { font-size:11px;color:var(--testo3);font-style:italic; }
 
+/* SW UPDATE BANNER */
+#sw-update-banner{
+  display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:#1c2128;color:#fff;border-radius:10px;padding:12px 20px;
+  box-shadow:0 4px 24px rgba(0,0,0,0.25);z-index:99999;
+  align-items:center;gap:14px;font-size:13px;font-weight:500;
+  white-space:nowrap;
+}
+#sw-update-banner.show{display:flex;}
+#sw-update-btn{
+  background:var(--verde);color:#fff;border:none;border-radius:6px;
+  padding:6px 14px;font-family:'Geist',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;transition:background 0.15s;
+}
+#sw-update-btn:hover{background:#155925;}
+
 </style>
 </head>
 <body>
+
+<div id="sw-update-banner">
+  <span>🔄 Nuova versione disponibile</span>
+  <button id="sw-update-btn" onclick="swApplyUpdate()">Aggiorna</button>
+</div>
 
 <div class="loading-bar" id="loading-bar"></div>
 
@@ -3846,11 +3867,47 @@ async function cambiaStatoSegn(id, stato) {
   </div>
 </div>
 
-<!-- PWA: registrazione Service Worker -->
+<!-- PWA: registrazione Service Worker con rilevamento aggiornamenti -->
 <script>
+let _swWaiting = null;
+
+function swApplyUpdate() {
+  if (_swWaiting) {
+    _swWaiting.postMessage({ type: 'SKIP_WAITING' });
+  }
+  window.location.reload();
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      // Controlla subito se c'è già un SW in attesa
+      if (reg.waiting) {
+        _swWaiting = reg.waiting;
+        document.getElementById('sw-update-banner').classList.add('show');
+      }
+
+      // Ascolta i futuri aggiornamenti
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            _swWaiting = newWorker;
+            document.getElementById('sw-update-banner').classList.add('show');
+          }
+        });
+      });
+    }).catch(() => {});
+
+    // Quando il SW cambia (dopo SKIP_WAITING), ricarica la pagina
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   });
 }
 </script>
