@@ -1614,7 +1614,8 @@ function buildNavbar() {
   const tabs = isFull ? tabsFull : isRO ? tabsRO : tabsSez;
   navbar.innerHTML = tabs.map(t =>
     `<button class="nav-tab" data-tab="${t.id}" onclick="showTab('${t.id}')">${t.label}</button>`
-  ).join('');
+  ).join('') +
+  `<a class="nav-tab" href="https://www.google.com/maps/d/u/2/viewer?mid=1c3OipIcYOssM6SuIB_CPsdXv1UbbD_Q&ll=44.41981083520628%2C8.806570201136402&z=13" target="_blank" rel="noopener noreferrer">🗺️ Mappa</a>`;
 }
 
 // ── LOADING ───────────────────────────────────────────────────
