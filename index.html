@@ -1269,7 +1269,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Targa</th><th>Marca / Modello</th><th>Tipologia</th><th>Sezione</th><th>Turni</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>Targa</th><th>Marca / Modello</th><th>Tipologia</th><th>Utilizzo</th><th>Sezione</th><th>Turni</th><th>Azioni</th></tr></thead>
             <tbody id="tbody-mezzi"></tbody>
           </table>
         </div>
@@ -2127,11 +2127,41 @@ function renderTurnoAttivo() {
 }
 
 // ── DRAG & DROP ───────────────────────────────────────────────
+let _dragScrollRAF = null;
+let _dragCursorY = 0;
+const _SCROLL_ZONE = 100;
+const _SCROLL_MAX  = 18;
+
+function _startDragScroll() {
+  if (_dragScrollRAF) return;
+  (function loop() {
+    const vh = window.innerHeight;
+    const y  = _dragCursorY;
+    let speed = 0;
+    if (y < _SCROLL_ZONE) {
+      speed = -_SCROLL_MAX * (1 - y / _SCROLL_ZONE);
+    } else if (y > vh - _SCROLL_ZONE) {
+      speed = _SCROLL_MAX * (1 - (vh - y) / _SCROLL_ZONE);
+    }
+    if (speed !== 0) window.scrollBy(0, speed);
+    _dragScrollRAF = requestAnimationFrame(loop);
+  })();
+}
+
+function _stopDragScroll() {
+  if (_dragScrollRAF) { cancelAnimationFrame(_dragScrollRAF); _dragScrollRAF = null; }
+}
+
+document.addEventListener('dragover',  e => { _dragCursorY = e.clientY; });
+document.addEventListener('dragend',   _stopDragScroll);
+document.addEventListener('drop',      _stopDragScroll);
+
 function dragStart(e, tipo, id) {
   _dragData = { tipo, id };
   e.dataTransfer.effectAllowed = 'move';
   e.currentTarget.style.opacity = '0.5';
   setTimeout(() => { if(e.currentTarget) e.currentTarget.style.opacity = ''; }, 0);
+  _startDragScroll();
 }
 function dragOver(e) {
   e.preventDefault();
@@ -2609,15 +2639,18 @@ async function renderInserimentoMezzi() {
     // Popola tabella mezzi
     const tbody = document.getElementById('tbody-mezzi');
     if (!mezzi || !mezzi.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
       return;
     }
     tbody.innerHTML = mezzi.map(m => {
       const turniMezzo = (mezziTurni || []).filter(mt => mt['MEZZO_ID'] === m.id).map(mt => mt['TURNO']);
+      const utilizzo = m['UTILIZZO'] || 'VARCO';
+      const utilizzoColor = utilizzo === 'VARCO' ? 'badge-green' : utilizzo === 'TRASPORTO' ? 'badge-orange' : 'badge-grey';
       return `<tr>
         <td><span class="mono" style="font-weight:700">${m['TARGA']}</span></td>
         <td>${m['MARCA'] || '—'} ${m['MODELLO'] || ''}</td>
         <td>${m['TIPOLOGIA'] ? `<span class="badge badge-blue">${m['TIPOLOGIA']}</span>` : '—'}</td>
+        <td><span class="badge ${utilizzoColor}">${utilizzo}</span></td>
         <td><span class="badge badge-grey">${m['SEZIONE'] || '—'}</span></td>
         <td style="font-size:12px">${turniMezzo.length ? turniMezzo.join(', ') : '<span style="color:var(--testo3)">Nessuno</span>'}</td>
         <td style="white-space:nowrap">
