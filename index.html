@@ -2657,32 +2657,39 @@ async function salvaVolontari() {
         const v = vols[i];
         if (!v.nome.trim()) continue; // salta righe vuote
 
-        const isJolly = varcoNum === null || contatore >= 2;
-        contatore++;
-
-        const row = {
-          'NOME_COGNOME':   v.nome.trim().toUpperCase(),
-          'CODICE_FISCALE': v.cf.trim().toUpperCase() || null,
-          'TELEFONO':       v.tel.trim() || null,
-          'NON_PC':         v.nonpc || false,
-          'SEZIONE':        sezione,
-          'TURNO':          turno,
-          'VARCO':          varcoNum,
-          'JOLLY':          isJolly,
-        };
-
         if (v.id) {
-          // Aggiorna esistente
-          const { error } = await sb.from('VOLONTARI').update(row).eq('id', v.id);
+          // Aggiorna esistente: MAI toccare VARCO o JOLLY, che possono essere stati
+          // assegnati manualmente dalla griglia turni dall'admin FULL.
+          const rowUpdate = {
+            'NOME_COGNOME':   v.nome.trim().toUpperCase(),
+            'CODICE_FISCALE': v.cf.trim().toUpperCase() || null,
+            'TELEFONO':       v.tel.trim() || null,
+            'NON_PC':         v.nonpc || false,
+            'SEZIONE':        sezione,
+            'TURNO':          turno,
+          };
+          const { error } = await sb.from('VOLONTARI').update(rowUpdate).eq('id', v.id);
           if (error) throw error;
+          totSalvati++;
         } else {
-          // Inserisci nuovo
-          const { data: ins, error } = await sb.from('VOLONTARI').insert(row).select().single();
+          // Nuovo volontario: applica la logica di auto-assegnazione VARCO
+          const isJolly = varcoNum === null || contatore >= 2;
+          contatore++;
+          const rowInsert = {
+            'NOME_COGNOME':   v.nome.trim().toUpperCase(),
+            'CODICE_FISCALE': v.cf.trim().toUpperCase() || null,
+            'TELEFONO':       v.tel.trim() || null,
+            'NON_PC':         v.nonpc || false,
+            'SEZIONE':        sezione,
+            'TURNO':          turno,
+            'VARCO':          varcoNum,
+            'JOLLY':          isJolly,
+          };
+          const { data: ins, error } = await sb.from('VOLONTARI').insert(rowInsert).select().single();
           if (error) throw error;
-          v.id = ins.id; // salva id per futuri update
+          v.id = ins.id;
+          isJolly ? totJolly++ : totSalvati++;
         }
-
-        isJolly ? totJolly++ : totSalvati++;
       }
     }
 
