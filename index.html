@@ -1090,7 +1090,6 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
     <button class="nav-tab" onclick="showTab('dashboard')">📊 Dashboard</button>
     <button class="nav-tab" onclick="showTab('sezioni')">🗂️ Volontari per Sezione</button>
     <button class="nav-tab" onclick="showTab('griglia')">📋 Gestione Turni</button>
-    <button class="nav-tab disabled" onclick="showTab('utenti')">👥 Utenti</button>
     <button class="nav-tab" onclick="showTab('inserimento')">📥 Inserimento Volontari</button>
     <button class="nav-tab" onclick="showTab('mezzi')">🚗 Inserimento Mezzi</button>
     <button class="nav-tab disabled" title="In costruzione">⚙️ Utility</button>
@@ -1201,26 +1200,6 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         </div>
       </div>
     </div>
-
-    <!-- ── UTENTI ── -->
-    <div id="tab-utenti" style="display:none">
-      <div class="page-header">
-        <div class="page-title">Utenti <small>Gestione accessi al portale</small></div>
-        <button class="btn btn-primary" onclick="openNewUtente()">+ Aggiungi utente</button>
-      </div>
-      <div style="margin-bottom:16px">
-        <input class="search-input" id="search-utenti" type="text" placeholder="Cerca username o sezione…" oninput="renderUtenti()">
-      </div>
-      <div class="panel">
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Username</th><th>Sezione</th><th>Tipologia</th><th>Azioni</th></tr></thead>
-            <tbody id="tbody-utenti"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
 
     <!-- ── INSERIMENTO VOLONTARI ── -->
     <div id="tab-inserimento" style="display:none">
@@ -1498,37 +1477,6 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
   </div>
 </div>
 
-<!-- MODAL UTENTE -->
-<div class="modal-overlay" id="modal-utente">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="modal-utente-title">Aggiungi utente</div>
-      <button class="modal-close" onclick="closeModal('modal-utente')">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="utente-id">
-      <div class="field-group"><label>Username *</label><input type="text" id="utente-user" style="text-transform:uppercase"></div>
-      <div class="field-group"><label>Password *</label><input type="password" id="utente-pass" placeholder="Lascia vuoto per non modificare"></div>
-      <div class="field-group"><label>Tipologia accesso *</label>
-        <select id="utente-tipo" onchange="toggleSezione()">
-          <option value="ACCESSO SEZIONALE">Accesso Sezionale (Standard)</option>
-          <option value="ACCESSO SEZIONALE_RO">Accesso Sezionale (Sola Lettura)</option>
-          <option value="ACCESSO FULL">Accesso Full (Admin)</option>
-        </select>
-      </div>
-      <div class="field-group" id="field-sezione">
-        <label>Sezione ANA *</label>
-        <input type="text" id="utente-sezione" style="text-transform:uppercase" placeholder="es. GENOVA">
-      </div>
-      <div class="form-alert" id="utente-alert"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-utente')">Annulla</button>
-      <button class="btn btn-primary" onclick="saveUtente()">Salva</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL ASSEGNA VOLONTARIO -->
 <div class="modal-overlay" id="modal-assegna">
   <div class="modal">
@@ -1603,7 +1551,6 @@ function buildNavbar() {
     { id:'varchi',      label:'Varchi' },
     { id:'inserimento', label:'Inserimento Volontari' },
     { id:'mezzi',       label:'Inserimento Mezzi' },
-    { id:'utenti',      label:'Utenti' },
     { id:'utility',     label:'Utility' },
   ];
 
@@ -1691,7 +1638,7 @@ function showTab(name) {
     if (t.dataset.tab === name) t.classList.add('active');
   });
   aggiornaDrawerTab();
-  const renders = { dashboard: renderDashboard, sezioni: renderSezioni, griglia: renderGriglia, varchi: renderVarchi, utenti: renderUtenti, inserimento: renderInserimento, mezzi: renderInserimentoMezzi, utility: renderUtility };
+  const renders = { dashboard: renderDashboard, sezioni: renderSezioni, griglia: renderGriglia, varchi: renderVarchi, inserimento: renderInserimento, mezzi: renderInserimentoMezzi, utility: renderUtility };
   if (renders[name]) renders[name]();
 }
 
@@ -2349,100 +2296,6 @@ async function renderVarchi() {
   } finally {
     setLoading(false);
   }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  UTENTI
-// ══════════════════════════════════════════════════════════════
-async function renderUtenti() {
-  setLoading(true);
-  try {
-    const q = (document.getElementById('search-utenti')?.value || '').toLowerCase();
-    const { data: list, error } = await sb.from('UTENTI').select('*').order('Nome Utente');
-    if (error) throw error;
-    const filtered = (list || []).filter(u =>
-      !q || (u['Nome Utente']||'').toLowerCase().includes(q) || (u['SEZIONE']||'').toLowerCase().includes(q)
-    );
-    const tbody = document.getElementById('tbody-utenti');
-    if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="ei">👤</div><p>Nessun utente trovato.</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = filtered.map((u, i) => `
-      <tr>
-        <td style="color:var(--testo3);font-size:12px">${String(i+1).padStart(2,'0')}</td>
-        <td><strong>${u['Nome Utente']}</strong></td>
-        <td>${u['SEZIONE'] ? `<span class="badge badge-grey">${u['SEZIONE']}</span>` : '<span style="color:var(--testo3)">—</span>'}</td>
-        <td>${u['TIPOLOGIA'] === 'ACCESSO FULL' ? '<span class="tag-full">⭐ Accesso Full</span>' : u['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO' ? '<span class="tag-sez" style="background:var(--arancio-light);color:var(--arancio)">👁 Sola lettura</span>' : '<span class="tag-sez">Sezionale</span>'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-ghost" onclick="editUtente('${u['Nome Utente'].replace(/'/g,"\\'")}')">Modifica</button>
-          ${u['Nome Utente'] !== CU['Nome Utente']
-            ? `<button class="btn btn-danger" onclick="deleteUtente('${u['Nome Utente'].replace(/'/g,"\\'")}','${u['Nome Utente'].replace(/'/g,"\\'")}')">Rimuovi</button>`
-            : '<span style="font-size:11px;color:var(--testo3);margin-left:8px">(attivo)</span>'}
-        </td>
-      </tr>`).join('');
-  } catch(e) { console.error(e); }
-  finally { setLoading(false); }
-}
-
-function toggleSezione() {
-  const tipo = document.getElementById('utente-tipo').value;
-  document.getElementById('field-sezione').style.display = tipo === 'ACCESSO FULL' ? 'none' : '';
-}
-
-function openNewUtente() {
-  document.getElementById('utente-id').value = '';
-  document.getElementById('utente-user').value = '';
-  document.getElementById('utente-pass').value = '';
-  document.getElementById('utente-tipo').value = 'ACCESSO SEZIONALE';
-  document.getElementById('utente-sezione').value = '';
-  document.getElementById('utente-alert').className = 'form-alert';
-  document.getElementById('modal-utente-title').textContent = 'Aggiungi utente';
-  toggleSezione(); openModal('modal-utente');
-}
-
-async function editUtente(id) {
-  const { data: u } = await sb.from('UTENTI').select('*').eq('Nome Utente', id).single();
-  if (!u) return;
-  document.getElementById('utente-id').value = u['Nome Utente'];
-  document.getElementById('utente-user').value = u['Nome Utente'];
-  document.getElementById('utente-pass').value = '';
-  document.getElementById('utente-tipo').value = u['TIPOLOGIA'] || 'ACCESSO SEZIONALE';
-  document.getElementById('utente-sezione').value = u['SEZIONE'] || '';
-  document.getElementById('utente-alert').className = 'form-alert';
-  document.getElementById('modal-utente-title').textContent = 'Modifica utente';
-  toggleSezione(); openModal('modal-utente');
-}
-
-async function saveUtente() {
-  const username = document.getElementById('utente-user').value.trim().toUpperCase();
-  const pass     = document.getElementById('utente-pass').value;
-  const tipo     = document.getElementById('utente-tipo').value;
-  const sezione  = document.getElementById('utente-sezione').value.trim().toUpperCase() || null;
-  const id       = document.getElementById('utente-id').value;
-  if (!username) { showFormAlert('utente-alert','Username obbligatorio','err'); return; }
-  if (!id && !pass) { showFormAlert('utente-alert','Password obbligatoria','err'); return; }
-  if (tipo !== 'ACCESSO FULL' && !sezione) { showFormAlert('utente-alert','Inserisci la sezione','err'); return; }
-  const row = { 'Nome Utente': username, 'TIPOLOGIA': tipo, 'SEZIONE': tipo === 'ACCESSO FULL' ? null : sezione };
-  if (pass) row['PASSWORD'] = pass;
-  setLoading(true);
-  try {
-    if (id) { const { error } = await sb.from('UTENTI').update(row).eq('Nome Utente', id); if (error) throw error; }
-    else     { const { error } = await sb.from('UTENTI').insert(row); if (error) throw error; }
-    closeModal('modal-utente'); renderUtenti();
-  } catch(e) { showFormAlert('utente-alert','Errore: '+(e.message||e),'err'); }
-  finally { setLoading(false); }
-}
-
-async function deleteUtente(id, username) {
-  if (!confirm(`Eliminare l'utente "${username}"?`)) return;
-  setLoading(true);
-  try {
-    const { error } = await sb.from('UTENTI').delete().eq('Nome Utente', id);
-    if (error) throw error;
-    renderUtenti();
-  } catch(e) { alert('Errore: '+e.message); }
-  finally { setLoading(false); }
 }
 
 // ══════════════════════════════════════════════════════════════
