@@ -1336,6 +1336,17 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
               </div>
             </div>
 
+            <div class="form-row" style="margin-bottom:16px" id="mezzo-utilizzo-wrap">
+              <div class="field-group">
+                <label>Tipo utilizzo</label>
+                <select id="mezzo-utilizzo">
+                  <option value="VARCO">VARCO</option>
+                  <option value="TRASPORTO">TRASPORTO</option>
+                  <option value="ALTRO">ALTRO</option>
+                </select>
+              </div>
+            </div>
+
             <div class="field-group" id="mezzo-sezione-wrap" style="margin-bottom:20px">
               <label>Sezione di Appartenenza *</label>
               <select id="mezzo-sezione">
@@ -2022,7 +2033,7 @@ function renderTurnoAttivo() {
 
   // Logica posizionale mezzi: primo mezzo per varco = principale, dal 2° = extra
   function splitMezziVarco(varcoNum) {
-    let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
+    let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum && (!mt['MEZZI']['UTILIZZO'] || mt['MEZZI']['UTILIZZO'] === 'VARCO')).sort((a,b) => a.id - b.id);
     if (isSez) tutti = tutti.filter(mt => mt['MEZZI']['SEZIONE'] === miaSez);
     return { principale: tutti.slice(0, 1), extra: tutti.slice(1) };
   }
@@ -2268,7 +2279,7 @@ async function openAssegnaMezzo(varco, turno, sezVarco) {
   document.getElementById('assegna-mezzo-info').innerHTML =
     `<strong>Varco:</strong> ${varco} &nbsp;·&nbsp; <strong>Turno:</strong> ${turno}<br><strong>Sezione:</strong> ${sezVarco || '—'}`;
   const occupatiIds = _mezziTurni.filter(mt => mt['TURNO'] === turno).map(mt => mt['MEZZO_ID']);
-  const disp = _mezzi.filter(m => !occupatiIds.includes(m.id));
+  const disp = _mezzi.filter(m => !occupatiIds.includes(m.id) && (!m['UTILIZZO'] || m['UTILIZZO'] === 'VARCO'));
   document.getElementById('assegna-mezzo-sel').innerHTML = disp.length
     ? disp.map(m => `<option value="${m.id}">${m['TARGA']} · ${m['MARCA'] || ''} ${m['MODELLO'] || ''} · ${m['SEZIONE'] || '—'}</option>`).join('')
     : '<option value="">— Nessun mezzo disponibile —</option>';
@@ -2733,6 +2744,7 @@ async function renderInserimentoMezzi() {
       selSez.innerHTML = `<option value="${sezione}" selected>${sezione}</option>`;
       document.getElementById('mezzo-sezione-wrap').style.display = 'none';
     }
+    document.getElementById('mezzo-utilizzo-wrap').style.display = isFull ? '' : 'none';
 
     // Popola tabella mezzi
     const tbody = document.getElementById('tbody-mezzi');
@@ -2765,6 +2777,7 @@ function openFormMezzo() {
   document.getElementById('mezzo-marca').value = '';
   document.getElementById('mezzo-modello').value = '';
   document.getElementById('mezzo-tipologia').value = '';
+  document.getElementById('mezzo-utilizzo').value = 'VARCO';
   document.getElementById('mezzo-alert').className = 'form-alert';
   // Reset sezione
   if (CU['TIPOLOGIA'] !== 'ACCESSO FULL') {
@@ -2796,6 +2809,7 @@ async function editMezzo(id) {
     document.getElementById('mezzo-marca').value = m['MARCA'] || '';
     document.getElementById('mezzo-modello').value = m['MODELLO'] || '';
     document.getElementById('mezzo-tipologia').value = m['TIPOLOGIA'] || '';
+    document.getElementById('mezzo-utilizzo').value = m['UTILIZZO'] || 'VARCO';
     document.getElementById('mezzo-sezione').value = m['SEZIONE'] || '';
     document.getElementById('mezzo-alert').className = 'form-alert';
     // Setta checkboxes
@@ -2815,6 +2829,7 @@ async function salvaMezzo() {
   const marca    = document.getElementById('mezzo-marca').value.trim().toUpperCase();
   const modello  = document.getElementById('mezzo-modello').value.trim().toUpperCase();
   const tipologia= document.getElementById('mezzo-tipologia').value;
+  const utilizzo = CU['TIPOLOGIA'] === 'ACCESSO FULL' ? (document.getElementById('mezzo-utilizzo').value || 'VARCO') : 'VARCO';
   const sezione  = document.getElementById('mezzo-sezione').value || CU['SEZIONE'];
   const turniSel = [...document.querySelectorAll('input[name="mezzo-turno"]:checked')].map(cb => cb.value);
 
@@ -2829,7 +2844,7 @@ async function salvaMezzo() {
   const { data: varcoData } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).single();
   const varco = varcoData ? varcoData['VARCO'] : null;
 
-  const row = { TARGA: targa, MARCA: marca, MODELLO: modello, TIPOLOGIA: tipologia, SEZIONE: sezione, VARCO: varco };
+  const row = { TARGA: targa, MARCA: marca, MODELLO: modello, TIPOLOGIA: tipologia, UTILIZZO: utilizzo, SEZIONE: sezione, VARCO: varco };
 
   setLoading(true);
   try {
