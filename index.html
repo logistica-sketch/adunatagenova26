@@ -1990,7 +1990,7 @@ function renderTurnoAttivo() {
     return { principale: tutti.slice(0, 1), extra: tutti.slice(1) };
   }
 
-  let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totExtra=0;
+  let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0;
   let totMezziPrinc=0, totMezziExtra=0;
   _varchi.forEach(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
@@ -1999,11 +1999,12 @@ function renderTurnoAttivo() {
     else scoperti++;
     if (extra.length > 0) surplus++;
     totPrinc += principali.length;
-    totExtra += extra.length;
     const { principale: mp, extra: me } = splitMezziVarco(v['VARCO']);
     totMezziPrinc += mp.length;
     totMezziExtra += me.length;
   });
+  // EXTRA = tutti i non-principali: JOLLY=true (surplus in varco) + VARCO=null (pool non assegnati)
+  const totExtra = volTurno.filter(v => v['JOLLY'] === true || !v['VARCO']).length;
   const totSlot = _varchi.length * 2;
   const pCop = totSlot ? Math.round(totPrinc / totSlot * 100) : 0;
 
