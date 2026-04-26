@@ -2593,8 +2593,13 @@ let _sezioniList = [];
 
 async function loadSezioniList(force = false) {
   if (_sezioniList.length && !force) return;
-  const { data } = await sb.from('VARCHI').select('SEZIONI').order('SEZIONI');
-  _sezioniList = [...new Set((data || []).map(r => r['SEZIONI']).filter(Boolean))].sort();
+  const [{ data: varchiData }, { data: sezioniData }] = await Promise.all([
+    sb.from('VARCHI').select('SEZIONI').order('SEZIONI'),
+    sb.from('SEZIONI').select('SEZIONE').order('SEZIONE'),
+  ]);
+  const daVarchi  = (varchiData  || []).map(r => r['SEZIONI']).filter(Boolean);
+  const daSezioni = (sezioniData || []).map(r => r['SEZIONE']).filter(Boolean);
+  _sezioniList = [...new Set([...daVarchi, ...daSezioni])].sort();
 }
 
 async function renderInserimentoMezzi() {
