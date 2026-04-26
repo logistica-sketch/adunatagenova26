@@ -2109,11 +2109,12 @@ function renderTurnoAttivo() {
     </tr>`;
   }).join('');
 
-  // Area JOLLY: tutti i volontari del turno con JOLLY=true (solo admin FULL)
+  // Area JOLLY: volontari del turno senza varco assegnato (solo admin FULL)
+  // Regola: VARCO=null → jolly/non assegnato. VARCO non null → sta nel varco (JOLLY indica solo principale/extra lì dentro).
   const poolWrap = document.getElementById('pool-jolly-wrap');
   if (!isSez) {
     poolWrap.style.display = '';
-    const pool = volTurno.filter(v => v['JOLLY'] === true);
+    const pool = volTurno.filter(v => !v['VARCO']);
     document.getElementById('pool-jolly-chips').innerHTML = pool.length
       ? pool.map(vol =>
           `<div class="vol-chip-table extra" draggable="true" ondragstart="dragStart(event,'vol',${vol.id})">
