@@ -1857,8 +1857,12 @@ async function renderSezioni() {
       sezioni = [...new Set([..._sezioniList, ...daVarchi, ...daVol])].sort();
     }
 
-    // Salva sezioni per PDF e aggiorna UI pulsanti
-    _sezioniCorrente = sezioni;
+    // Salva dati per PDF (snapshot dedicato, indipendente da altri render)
+    _sezioniCorrente  = sezioni;
+    _volontariPerPdf  = volontari  || [];
+    _mezziPerPdf      = mezzi      || [];
+    _varchiPerPdf     = varchi     || [];
+    _turniPerPdf      = turni      || [];
     const pdfFullWrap = document.getElementById('pdf-full-wrap');
     const pdfSezBtn   = document.getElementById('pdf-sez-btn');
     if (isFull) {
@@ -2004,7 +2008,8 @@ function _generaPdf(sezioni) {
     y += 8;
 
     // ── Volontari ─────────────────────────────────────────────
-    const volSez = _volontari.filter(v => v['SEZIONE'] === sez);
+    const sezLow    = sez.trim().toLowerCase();
+    const volSez    = _volontariPerPdf.filter(v => (v['SEZIONE']||'').trim().toLowerCase() === sezLow);
     const principali = volSez.filter(v => !v['JOLLY'] && v['VARCO']);
     const extra      = volSez.filter(v =>  v['JOLLY'] || !v['VARCO']);
 
@@ -2015,9 +2020,9 @@ function _generaPdf(sezioni) {
     y += 4;
 
     const volRows = [...principali, ...extra].map(v => {
-      const turnoObj  = (_turni||[]).find(t => t['Etichetta'] === v['TURNO']);
+      const turnoObj  = _turniPerPdf.find(t => t['Etichetta'] === v['TURNO']);
       const turnoStr  = turnoObj ? (turnoObj['NOME TURNO'] || v['TURNO']) : (v['TURNO'] || '—');
-      const varcoRiga = (_varchi||[]).find(vx => vx['VARCO'] == v['VARCO']);
+      const varcoRiga = _varchiPerPdf.find(vx => vx['VARCO'] == v['VARCO']);
       const varcoStr  = v['VARCO'] != null ? `${v['VARCO']}` : (v['JOLLY'] ? 'JOLLY' : '—');
       const indir     = varcoRiga ? (varcoRiga['INDIRIZZO'] || '—') : '—';
       return [v['NOME_COGNOME']||'—', turnoStr, varcoStr, indir, v['TELEFONO']||'—'];
@@ -2036,7 +2041,7 @@ function _generaPdf(sezioni) {
     y = doc.lastAutoTable.finalY + 8;
 
     // ── Mezzi ─────────────────────────────────────────────────
-    const mezSez = (_mezzi||[]).filter(m => m['SEZIONE'] === sez);
+    const mezSez = _mezziPerPdf.filter(m => (m['SEZIONE']||'').trim().toLowerCase() === sezLow);
 
     doc.setFontSize(11); doc.setFont(undefined, 'bold');
     doc.setTextColor(...verde);
@@ -2816,6 +2821,7 @@ async function salvaVolontari() {
 // ══════════════════════════════════════════════════════════════
 let _sezioniList = [];
 let _sezioniCorrente = [];
+let _volontariPerPdf = [], _mezziPerPdf = [], _varchiPerPdf = [], _turniPerPdf = [];
 
 async function loadSezioniList(force = false) {
   if (_sezioniList.length && !force) return;
