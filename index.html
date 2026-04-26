@@ -1270,11 +1270,18 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
       <div class="panel" style="margin-bottom:24px">
         <div class="panel-header">
           <span class="panel-title">🚗 Mezzi registrati</span>
-          <button class="btn btn-primary btn-sm" onclick="openFormMezzo()">+ Aggiungi mezzo</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="openFormMezzo()">+ Aggiungi mezzo</button>
+            <label class="btn btn-secondary btn-sm" id="import-mezzi-btn" style="cursor:pointer;display:none;margin:0">
+              ⬆ Importa da Excel
+              <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importaMezziExcel(this)">
+            </label>
+          </div>
         </div>
+        <div class="form-alert" id="import-mezzi-alert" style="margin:8px 16px 0;display:none"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Targa</th><th>Marca / Modello</th><th>Tipologia</th><th>Utilizzo</th><th>Sezione</th><th>Turni</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>Targa</th><th>Descrizione</th><th>Tipologia</th><th>Utilizzo</th><th>Sezione</th><th>Dislocazione</th><th>Turni</th><th>Note</th><th>Azioni</th></tr></thead>
             <tbody id="tbody-mezzi"></tbody>
           </table>
         </div>
@@ -1296,18 +1303,14 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
                 <input type="text" id="mezzo-targa" style="text-transform:uppercase" placeholder="Es. AB123CD">
               </div>
               <div class="field-group">
-                <label>Marca *</label>
-                <input type="text" id="mezzo-marca" style="text-transform:uppercase" placeholder="Es. FIAT">
+                <label>Descrizione *</label>
+                <input type="text" id="mezzo-descrizione" style="text-transform:uppercase" placeholder="Es. FIAT DUCATO">
               </div>
             </div>
 
             <div class="form-row" style="margin-bottom:16px">
               <div class="field-group">
-                <label>Modello *</label>
-                <input type="text" id="mezzo-modello" style="text-transform:uppercase" placeholder="Es. DUCATO">
-              </div>
-              <div class="field-group">
-                <label>Tipologia *</label>
+                <label>Tipologia</label>
                 <select id="mezzo-tipologia">
                   <option value="">Seleziona una tipologia</option>
                   <option value="FUORISTRADA">FUORISTRADA</option>
@@ -1318,27 +1321,63 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
                   <option value="ALTRO">ALTRO</option>
                 </select>
               </div>
-            </div>
-
-            <div class="form-row" style="margin-bottom:16px" id="mezzo-utilizzo-wrap">
-              <div class="field-group">
+              <div class="field-group" id="mezzo-utilizzo-wrap">
                 <label>Tipo utilizzo</label>
                 <select id="mezzo-utilizzo">
-                  <option value="VARCO">VARCO</option>
+                  <option value="VARCHI">VARCHI</option>
+                  <option value="TR VOLONTARI">TR VOLONTARI</option>
+                  <option value="SERVIZIO">SERVIZIO</option>
                   <option value="TRASPORTO">TRASPORTO</option>
-                  <option value="ALTRO">ALTRO</option>
+                  <option value="SUPP CUCINA">SUPP CUCINA</option>
+                  <option value="DISL VOLONTARI">DISL VOLONTARI</option>
                 </select>
               </div>
             </div>
 
-            <div class="field-group" id="mezzo-sezione-wrap" style="margin-bottom:20px">
-              <label>Sezione di Appartenenza *</label>
-              <select id="mezzo-sezione">
-                <option value="">Seleziona una sezione</option>
-              </select>
+            <div class="form-row" style="margin-bottom:16px">
+              <div class="field-group" id="mezzo-sezione-wrap">
+                <label>Sezione di Appartenenza *</label>
+                <select id="mezzo-sezione">
+                  <option value="">Seleziona una sezione</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label>Dislocazione</label>
+                <select id="mezzo-dislocazione">
+                  <option value="">—</option>
+                  <option value="PORTO">PORTO</option>
+                  <option value="VARCO">VARCO</option>
+                  <option value="CITTADELLA">CITTADELLA</option>
+                </select>
+              </div>
             </div>
 
-            <div class="field-group">
+            <div class="form-row" style="margin-bottom:16px">
+              <div class="field-group">
+                <label style="margin-bottom:10px">Flags</label>
+                <div style="display:flex;flex-wrap:wrap;gap:20px">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+                    <input type="checkbox" id="mezzo-accesso-porto" style="width:16px;height:16px;accent-color:var(--verde)">
+                    Accesso Porto
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+                    <input type="checkbox" id="mezzo-parcheggio" style="width:16px;height:16px;accent-color:var(--verde)">
+                    Parcheggio
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+                    <input type="checkbox" id="mezzo-aut" style="width:16px;height:16px;accent-color:var(--verde)">
+                    AUT
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-group" style="margin-bottom:16px">
+              <label>Note</label>
+              <textarea id="mezzo-note" rows="2" style="width:100%;resize:vertical;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:inherit" placeholder="Note aggiuntive..."></textarea>
+            </div>
+
+            <div class="field-group" style="margin-bottom:20px">
               <label>Turni Assegnati *</label>
               <p style="font-size:12px;color:var(--testo3);margin-bottom:12px">Seleziona i turni in cui il mezzo sarà disponibile</p>
               <div id="mezzo-turni-checks" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
@@ -1985,7 +2024,7 @@ function renderTurnoAttivo() {
 
   // Logica posizionale mezzi: primo mezzo per varco = principale, dal 2° = extra
   function splitMezziVarco(varcoNum) {
-    let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum && (!mt['MEZZI']['UTILIZZO'] || mt['MEZZI']['UTILIZZO'] === 'VARCO')).sort((a,b) => a.id - b.id);
+    let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum && mt['MEZZI']['UTILIZZO'] === 'VARCHI').sort((a,b) => a.id - b.id);
     if (isSez) tutti = tutti.filter(mt => mt['MEZZI']['SEZIONE'] === miaSez);
     return { principale: tutti.slice(0, 1), extra: tutti.slice(1) };
   }
@@ -2075,13 +2114,13 @@ function renderTurnoAttivo() {
       const sezLine = `<div class="mc-sez">Sez: ${m['SEZIONE'] || '—'}</div>`;
       if (isSez) {
         return `<div class="mezzo-chip readonly${isExtra ? ' extra' : ''}">
-          <div class="mc-targa">${m['TARGA']} – ${m['MARCA']||''} ${m['MODELLO']||''}</div>
+          <div class="mc-targa">${m['TARGA']}${m['DESCRIZIONE'] ? ' – ' + m['DESCRIZIONE'] : ''}</div>
           <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
           ${sezLine}${badge}
         </div>`;
       }
       return `<div class="mezzo-chip${isExtra ? ' extra' : ''}" draggable="true" ondragstart="dragStart(event,'mezzo',${mt.id})">
-        <div class="mc-targa">${m['TARGA']} – ${m['MARCA']||''} ${m['MODELLO']||''}</div>
+        <div class="mc-targa">${m['TARGA']}${m['DESCRIZIONE'] ? ' – ' + m['DESCRIZIONE'] : ''}</div>
         <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
         ${sezLine}${badge}
         <button class="mc-remove" onclick="rimuoviMezzo(${mt.id})" title="Rimuovi">✕</button>
@@ -2685,24 +2724,29 @@ async function renderInserimentoMezzi() {
       document.getElementById('mezzo-sezione-wrap').style.display = 'none';
     }
     document.getElementById('mezzo-utilizzo-wrap').style.display = isFull ? '' : 'none';
+    const importBtn = document.getElementById('import-mezzi-btn');
+    if (importBtn) importBtn.style.display = isFull ? '' : 'none';
 
     // Popola tabella mezzi
     const tbody = document.getElementById('tbody-mezzi');
     if (!mezzi || !mezzi.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
       return;
     }
     tbody.innerHTML = mezzi.map(m => {
       const turniMezzo = (mezziTurni || []).filter(mt => mt['MEZZO_ID'] === m.id).map(mt => mt['TURNO']);
-      const utilizzo = m['UTILIZZO'] || 'VARCO';
-      const utilizzoColor = utilizzo === 'VARCO' ? 'badge-green' : utilizzo === 'TRASPORTO' ? 'badge-orange' : 'badge-grey';
+      const utilizzo = m['UTILIZZO'] || 'VARCHI';
+      const utilizzoColor = utilizzo === 'VARCHI' ? 'badge-green' : (utilizzo === 'TRASPORTO' || utilizzo === 'TR VOLONTARI') ? 'badge-orange' : 'badge-grey';
+      const noteText = (m['NOTE'] || '').replace(/"/g, '&quot;');
       return `<tr>
         <td><span class="mono" style="font-weight:700">${m['TARGA']}</span></td>
-        <td>${m['MARCA'] || '—'} ${m['MODELLO'] || ''}</td>
+        <td>${m['DESCRIZIONE'] || '—'}</td>
         <td>${m['TIPOLOGIA'] ? `<span class="badge badge-blue">${m['TIPOLOGIA']}</span>` : '—'}</td>
         <td><span class="badge ${utilizzoColor}">${utilizzo}</span></td>
         <td><span class="badge badge-grey">${m['SEZIONE'] || '—'}</span></td>
+        <td>${m['DISLOCAZIONE'] ? `<span class="badge badge-grey">${m['DISLOCAZIONE']}</span>` : '—'}</td>
         <td style="font-size:12px">${turniMezzo.length ? turniMezzo.join(', ') : '<span style="color:var(--testo3)">Nessuno</span>'}</td>
+        <td style="font-size:12px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${noteText}">${m['NOTE'] || '—'}</td>
         <td style="white-space:nowrap">
           <button class="btn btn-ghost" onclick="editMezzo(${m.id})">Modifica</button>
           <button class="btn btn-danger" onclick="deleteMezzo(${m.id},'${m['TARGA']}')">Rimuovi</button>
@@ -2717,18 +2761,20 @@ function openFormMezzo() {
   document.getElementById('mezzo-edit-id').value = '';
   document.getElementById('form-mezzo-title').textContent = 'Aggiungi nuovo mezzo';
   document.getElementById('mezzo-targa').value = '';
-  document.getElementById('mezzo-marca').value = '';
-  document.getElementById('mezzo-modello').value = '';
+  document.getElementById('mezzo-descrizione').value = '';
   document.getElementById('mezzo-tipologia').value = '';
-  document.getElementById('mezzo-utilizzo').value = 'VARCO';
+  document.getElementById('mezzo-utilizzo').value = 'VARCHI';
+  document.getElementById('mezzo-dislocazione').value = '';
+  document.getElementById('mezzo-accesso-porto').checked = false;
+  document.getElementById('mezzo-parcheggio').checked = false;
+  document.getElementById('mezzo-aut').checked = false;
+  document.getElementById('mezzo-note').value = '';
   document.getElementById('mezzo-alert').className = 'form-alert';
-  // Reset sezione
   if (CU['TIPOLOGIA'] !== 'ACCESSO FULL') {
     document.getElementById('mezzo-sezione').value = CU['SEZIONE'];
   } else {
     document.getElementById('mezzo-sezione').value = '';
   }
-  // Reset checkboxes
   document.querySelectorAll('input[name="mezzo-turno"]').forEach(cb => cb.checked = false);
   document.getElementById('form-mezzo-wrap').style.display = '';
   document.getElementById('form-mezzo-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
@@ -2749,13 +2795,16 @@ async function editMezzo(id) {
     document.getElementById('mezzo-edit-id').value = m.id;
     document.getElementById('form-mezzo-title').textContent = `Modifica mezzo – ${m['TARGA']}`;
     document.getElementById('mezzo-targa').value = m['TARGA'] || '';
-    document.getElementById('mezzo-marca').value = m['MARCA'] || '';
-    document.getElementById('mezzo-modello').value = m['MODELLO'] || '';
+    document.getElementById('mezzo-descrizione').value = m['DESCRIZIONE'] || '';
     document.getElementById('mezzo-tipologia').value = m['TIPOLOGIA'] || '';
-    document.getElementById('mezzo-utilizzo').value = m['UTILIZZO'] || 'VARCO';
+    document.getElementById('mezzo-utilizzo').value = m['UTILIZZO'] || 'VARCHI';
     document.getElementById('mezzo-sezione').value = m['SEZIONE'] || '';
+    document.getElementById('mezzo-dislocazione').value = m['DISLOCAZIONE'] || '';
+    document.getElementById('mezzo-accesso-porto').checked = !!m['ACCESSO_PORTO'];
+    document.getElementById('mezzo-parcheggio').checked = !!m['PARCHEGGIO'];
+    document.getElementById('mezzo-aut').checked = !!m['AUT'];
+    document.getElementById('mezzo-note').value = m['NOTE'] || '';
     document.getElementById('mezzo-alert').className = 'form-alert';
-    // Setta checkboxes
     const turniMezzo = (mt || []).map(x => x['TURNO']);
     document.querySelectorAll('input[name="mezzo-turno"]').forEach(cb => {
       cb.checked = turniMezzo.includes(cb.value);
@@ -2767,27 +2816,38 @@ async function editMezzo(id) {
 }
 
 async function salvaMezzo() {
-  const id       = document.getElementById('mezzo-edit-id').value;
-  const targa    = document.getElementById('mezzo-targa').value.trim().toUpperCase();
-  const marca    = document.getElementById('mezzo-marca').value.trim().toUpperCase();
-  const modello  = document.getElementById('mezzo-modello').value.trim().toUpperCase();
-  const tipologia= document.getElementById('mezzo-tipologia').value;
-  const utilizzo = CU['TIPOLOGIA'] === 'ACCESSO FULL' ? (document.getElementById('mezzo-utilizzo').value || 'VARCO') : 'VARCO';
-  const sezione  = document.getElementById('mezzo-sezione').value || CU['SEZIONE'];
-  const turniSel = [...document.querySelectorAll('input[name="mezzo-turno"]:checked')].map(cb => cb.value);
+  const id          = document.getElementById('mezzo-edit-id').value;
+  const targa       = document.getElementById('mezzo-targa').value.trim().toUpperCase();
+  const descrizione = document.getElementById('mezzo-descrizione').value.trim().toUpperCase();
+  const tipologia   = document.getElementById('mezzo-tipologia').value;
+  const utilizzo    = CU['TIPOLOGIA'] === 'ACCESSO FULL' ? (document.getElementById('mezzo-utilizzo').value || 'VARCHI') : 'VARCHI';
+  const sezione     = document.getElementById('mezzo-sezione').value || CU['SEZIONE'];
+  const dislocazione= document.getElementById('mezzo-dislocazione').value;
+  const accessoPorto= document.getElementById('mezzo-accesso-porto').checked;
+  const parcheggio  = document.getElementById('mezzo-parcheggio').checked;
+  const aut         = document.getElementById('mezzo-aut').checked;
+  const note        = document.getElementById('mezzo-note').value.trim();
+  const turniSel    = [...document.querySelectorAll('input[name="mezzo-turno"]:checked')].map(cb => cb.value);
 
-  if (!targa)    { showFormAlert('mezzo-alert','Inserisci la targa','err'); return; }
-  if (!marca)    { showFormAlert('mezzo-alert','Inserisci la marca','err'); return; }
-  if (!modello)  { showFormAlert('mezzo-alert','Inserisci il modello','err'); return; }
-  if (!tipologia){ showFormAlert('mezzo-alert','Seleziona una tipologia','err'); return; }
-  if (!sezione)  { showFormAlert('mezzo-alert','Seleziona la sezione','err'); return; }
+  if (!targa)       { showFormAlert('mezzo-alert','Inserisci la targa','err'); return; }
+  if (!descrizione) { showFormAlert('mezzo-alert','Inserisci la descrizione del mezzo','err'); return; }
+  if (!sezione)     { showFormAlert('mezzo-alert','Seleziona la sezione','err'); return; }
   if (!turniSel.length){ showFormAlert('mezzo-alert','Seleziona almeno un turno','err'); return; }
 
-  // Trova varco della sezione
-  const { data: varcoData } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).single();
-  const varco = varcoData ? varcoData['VARCO'] : null;
+  // Trova varco della sezione (solo se UTILIZZO = VARCHI)
+  let varco = null;
+  if (utilizzo === 'VARCHI') {
+    const { data: varcoData } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).maybeSingle();
+    varco = varcoData ? varcoData['VARCO'] : null;
+  }
 
-  const row = { TARGA: targa, MARCA: marca, MODELLO: modello, TIPOLOGIA: tipologia, UTILIZZO: utilizzo, SEZIONE: sezione, VARCO: varco };
+  const row = {
+    TARGA: targa, DESCRIZIONE: descrizione, TIPOLOGIA: tipologia,
+    UTILIZZO: utilizzo, SEZIONE: sezione, VARCO: varco,
+    DISLOCAZIONE: dislocazione || null,
+    ACCESSO_PORTO: accessoPorto, PARCHEGGIO: parcheggio, AUT: aut,
+    NOTE: note || null,
+  };
 
   setLoading(true);
   try {
@@ -2796,14 +2856,12 @@ async function salvaMezzo() {
       const { error } = await sb.from('MEZZI').update(row).eq('id', id);
       if (error) throw error;
       mezzoId = parseInt(id);
-      // Aggiorna turni: elimina vecchi e reinserisci
       await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', mezzoId);
     } else {
       const { data: ins, error } = await sb.from('MEZZI').insert(row).select().single();
       if (error) throw error;
       mezzoId = ins.id;
     }
-    // Inserisci associazioni turni
     if (turniSel.length) {
       const mtRows = turniSel.map(t => ({ MEZZO_ID: mezzoId, TURNO: t }));
       const { error } = await sb.from('MEZZI_TURNI').insert(mtRows);
@@ -2828,6 +2886,100 @@ async function deleteMezzo(id, targa) {
   finally { setLoading(false); }
 }
 
+
+// ── IMPORTAZIONE EXCEL MEZZI ──────────────────────────────────
+async function importaMezziExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const alertEl = document.getElementById('import-mezzi-alert');
+  alertEl.style.display = 'block';
+  alertEl.className = 'form-alert show';
+  alertEl.textContent = 'Lettura file in corso…';
+
+  try {
+    const data = await file.arrayBuffer();
+    const wb   = XLSX.read(data, { type: 'array' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    // Legge tutte le righe; salta header (prima riga)
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    const dataRows = raw.slice(1).filter(r => String(r[0] || '').trim());
+
+    if (!dataRows.length) {
+      alertEl.className = 'form-alert show err';
+      alertEl.textContent = 'Nessun dato trovato. Controlla il file.';
+      return;
+    }
+
+    // Carica dati esistenti
+    const [{ data: varchi }, { data: mezziEsistenti }] = await Promise.all([
+      sb.from('VARCHI').select('VARCO, SEZIONI'),
+      sb.from('MEZZI').select('id, TARGA'),
+    ]);
+    const targheMap = {};
+    (mezziEsistenti || []).forEach(m => { targheMap[m['TARGA'].trim().toUpperCase()] = m.id; });
+
+    let inseriti = 0, aggiornati = 0, saltati = 0;
+    const errori = [];
+
+    for (let i = 0; i < dataRows.length; i++) {
+      const r = dataRows[i];
+      // Colonne: TARGA | MEZZO/DESCRIZIONE | TIPOLOGIA | PROPRIETÀ/SEZIONE | UTILIZZO | DISLOCAZIONE | ACCESSO PORTO | PARCHEGGIO | AUT | NOTE
+      const targa       = String(r[0] || '').trim().toUpperCase();
+      const descrizione = String(r[1] || '').trim().toUpperCase();
+      const tipologia   = String(r[2] || '').trim().toUpperCase() || null;
+      const sezione     = String(r[3] || '').trim().toUpperCase() || null;
+      const utilizzo    = String(r[4] || '').trim().toUpperCase() || 'VARCHI';
+      const dislocazione= String(r[5] || '').trim().toUpperCase() || null;
+      const accessoPorto= ['SI','SÌ','YES','TRUE','1'].includes(String(r[6] || '').trim().toUpperCase());
+      const parcheggio  = ['SI','SÌ','YES','TRUE','1'].includes(String(r[7] || '').trim().toUpperCase());
+      const aut         = ['SI','SÌ','YES','TRUE','1'].includes(String(r[8] || '').trim().toUpperCase());
+      const note        = String(r[9] || '').trim() || null;
+
+      if (!targa) { saltati++; continue; }
+
+      // Trova VARCO (solo se UTILIZZO = VARCHI)
+      let varco = null;
+      if (utilizzo === 'VARCHI' && sezione) {
+        const vx = (varchi || []).find(v => (v['SEZIONI'] || '').trim().toUpperCase() === sezione);
+        if (vx) varco = vx['VARCO'];
+      }
+
+      const row = {
+        TARGA: targa, DESCRIZIONE: descrizione, TIPOLOGIA: tipologia,
+        SEZIONE: sezione, UTILIZZO: utilizzo, VARCO: varco,
+        DISLOCAZIONE: dislocazione, ACCESSO_PORTO: accessoPorto,
+        PARCHEGGIO: parcheggio, AUT: aut, NOTE: note,
+      };
+
+      try {
+        if (targheMap[targa] !== undefined) {
+          const { error } = await sb.from('MEZZI').update(row).eq('id', targheMap[targa]);
+          if (error) throw error;
+          aggiornati++;
+        } else {
+          const { data: ins, error } = await sb.from('MEZZI').insert(row).select('id').single();
+          if (error) throw error;
+          targheMap[targa] = ins.id;
+          inseriti++;
+        }
+      } catch(e) {
+        errori.push(`Riga ${i+2} (${targa}): ${e.message}`);
+        saltati++;
+      }
+    }
+
+    input.value = '';
+    let msg = `✅ Importazione completata: ${inseriti} inseriti, ${aggiornati} aggiornati, ${saltati} saltati.`;
+    if (errori.length) msg += '<br>⚠️ Errori:<br>' + errori.map(e => `• ${e}`).join('<br>');
+    alertEl.className = 'form-alert show ' + (errori.length ? 'err' : 'ok');
+    alertEl.innerHTML = msg;
+    await renderInserimentoMezzi();
+  } catch(e) {
+    console.error(e);
+    alertEl.className = 'form-alert show err';
+    alertEl.textContent = 'Errore durante l\'importazione: ' + e.message;
+  }
+}
 
 // ── MODIFICA VOLONTARIO (da sezioni) ──────────────────────────
 async function openEditVolontario(id) {
