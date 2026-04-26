@@ -1263,7 +1263,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
       </div>
 
       <div style="background:var(--blu-light);border:1px solid #c0d4f5;border-radius:var(--r);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--blu);">
-        <strong>Come funziona:</strong> Inserisci i mezzi della tua sezione. Ogni mezzo viene assegnato automaticamente al varco della sezione. Seleziona i turni in cui il mezzo sarà disponibile.
+        <strong>Come funziona:</strong> Inserisci i mezzi della tua sezione. Ogni mezzo con UTILIZZO=VARCHI viene assegnato automaticamente al varco della sezione.
       </div>
 
       <!-- Contatori mezzi -->
@@ -1288,6 +1288,11 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
           </div>
         </div>
         <div class="form-alert" id="import-mezzi-alert" style="margin:8px 16px 0;display:none"></div>
+        <div style="padding:10px 16px 0">
+          <input type="search" id="mezzi-search" placeholder="Cerca per targa, descrizione, sezione, utilizzo, note…"
+            oninput="filtraMezzi()"
+            style="width:100%;padding:8px 14px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:inherit">
+        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Targa</th><th>Descrizione</th><th>Tipologia</th><th>Sezione</th><th>Utilizzo</th><th>Dislocazione</th><th title="Accesso Porto">Porto</th><th>Parcheggio</th><th>Pass Full</th><th>Note</th><th></th></tr></thead>
@@ -1384,12 +1389,6 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
             <div class="field-group" style="margin-bottom:16px">
               <label>Note</label>
               <textarea id="mezzo-note" rows="2" style="width:100%;resize:vertical;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:inherit" placeholder="Note aggiuntive..."></textarea>
-            </div>
-
-            <div class="field-group" style="margin-bottom:20px">
-              <label>Turni Assegnati *</label>
-              <p style="font-size:12px;color:var(--testo3);margin-bottom:12px">Seleziona i turni in cui il mezzo sarà disponibile</p>
-              <div id="mezzo-turni-checks" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
             </div>
 
             <div class="form-alert" id="mezzo-alert" style="margin-top:16px"></div>
@@ -2690,24 +2689,11 @@ async function renderInserimentoMezzi() {
 
   setLoading(true);
   try {
-    // Carica turni e mezzi
-    const [{ data: turni }, { data: mezzi }, { data: mezziTurni }] = await Promise.all([
-      sb.from('TURNI').select('*').order('Etichetta'),
-      isFull
-        ? sb.from('MEZZI').select('*').order('TARGA')
-        : sb.from('MEZZI').select('*').eq('SEZIONE', sezione).order('TARGA'),
-      sb.from('MEZZI_TURNI').select('*'),
-    ]);
-    _turni = turni || [];
-
-    // Popola checkbox turni nel form
-    document.getElementById('mezzo-turni-checks').innerHTML = (_turni).map(t => `
-      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer;font-size:13px;font-weight:600;transition:all 0.15s;"
-        onmouseover="this.style.borderColor='var(--verde)'" onmouseout="this.style.borderColor='var(--border)'">
-        <input type="checkbox" value="${t['Etichetta']}" name="mezzo-turno"
-          style="width:16px;height:16px;accent-color:var(--verde);cursor:pointer">
-        ${t['NOME TURNO'] || t['Etichetta']}
-      </label>`).join('');
+    // Carica mezzi
+    const { data: mezzi } = await (isFull
+      ? sb.from('MEZZI').select('*').order('TARGA')
+      : sb.from('MEZZI').select('*').eq('SEZIONE', sezione).order('TARGA'));
+    _mezzi = mezzi || [];
 
     // Popola sezioni nel form (solo full può scegliere)
     await loadSezioniList();
@@ -2724,50 +2710,10 @@ async function renderInserimentoMezzi() {
     const importBtn = document.getElementById('import-mezzi-btn');
     if (importBtn) importBtn.style.display = isFull ? '' : 'none';
 
-    // Contatori in cima
-    const allM = mezzi || [];
+    // Aggiorna contatori e tabella (usa filtraMezzi per gestire anche la search)
     const cntEl = document.getElementById('mezzi-counters');
-    if (cntEl) {
-      cntEl.style.display = 'grid';
-      document.getElementById('cnt-mezzi-tot').textContent       = allM.length;
-      document.getElementById('cnt-mezzi-varchi').textContent    = allM.filter(m => m['UTILIZZO'] === 'VARCHI').length;
-      document.getElementById('cnt-mezzi-porto').textContent     = allM.filter(m => m['ACCESSO_PORTO']).length;
-      document.getElementById('cnt-mezzi-parcheggio').textContent= allM.filter(m => m['PARCHEGGIO']).length;
-      document.getElementById('cnt-mezzi-passful').textContent   = allM.filter(m => m['AUT']).length;
-    }
-
-    // Popola tabella mezzi con celle inline-editabili
-    const tbody = document.getElementById('tbody-mezzi');
-    if (!allM.length) {
-      tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = mezzi.map(m => {
-      const utilizzo = m['UTILIZZO'] || 'VARCHI';
-      const uColor = utilizzo === 'VARCHI' ? 'badge-green' : (utilizzo === 'TRASPORTO' || utilizzo === 'TR VOLONTARI') ? 'badge-orange' : 'badge-grey';
-      const noteQ = (m['NOTE'] || '').replace(/"/g, '&quot;');
-      const valQ = v => JSON.stringify(v ?? '').replace(/'/g, "&#39;");
-      const ec = (campo, html, val) =>
-        `<td onclick="editCellaMezzo(this,${m.id},'${campo}',${valQ(val)})" style="cursor:pointer" title="Clicca per modificare">${html}</td>`;
-      const bc = (campo, val) =>
-        `<td style="text-align:center;font-size:15px;cursor:pointer;color:${val?'var(--verde)':'var(--testo3)'}" onclick="toggleBoolMezzo(${m.id},'${campo}',${!!val})" title="Clicca per cambiare">${val?'✓':'✗'}</td>`;
-      return `<tr>
-        ${ec('TARGA',`<span class="mono" style="font-weight:700">${m['TARGA']}</span>`,m['TARGA'])}
-        ${ec('DESCRIZIONE',m['DESCRIZIONE']||'<span style="color:var(--testo3)">—</span>',m['DESCRIZIONE'])}
-        ${ec('TIPOLOGIA',m['TIPOLOGIA']?`<span class="badge badge-blue">${m['TIPOLOGIA']}</span>`:'—',m['TIPOLOGIA'])}
-        ${ec('SEZIONE',`<span class="badge badge-grey">${m['SEZIONE']||'—'}</span>`,m['SEZIONE'])}
-        ${ec('UTILIZZO',`<span class="badge ${uColor}">${utilizzo}</span>`,utilizzo)}
-        ${ec('DISLOCAZIONE',m['DISLOCAZIONE']?`<span class="badge badge-grey">${m['DISLOCAZIONE']}</span>`:'—',m['DISLOCAZIONE'])}
-        ${bc('ACCESSO_PORTO',m['ACCESSO_PORTO'])}
-        ${bc('PARCHEGGIO',m['PARCHEGGIO'])}
-        ${bc('AUT',m['AUT'])}
-        ${ec('NOTE',`<span style="max-width:120px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${noteQ}">${m['NOTE']||'—'}</span>`,m['NOTE'])}
-        <td style="white-space:nowrap">
-          <button class="btn btn-ghost btn-sm" onclick="editMezzo(${m.id});event.stopPropagation()" title="Form completo">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteMezzo(${m.id},'${m['TARGA']}');event.stopPropagation()">✕</button>
-        </td>
-      </tr>`;
-    }).join('');
+    if (cntEl) cntEl.style.display = 'grid';
+    filtraMezzi();
   } catch(e) { console.error(e); }
   finally { setLoading(false); }
 }
@@ -2790,7 +2736,6 @@ function openFormMezzo() {
   } else {
     document.getElementById('mezzo-sezione').value = '';
   }
-  document.querySelectorAll('input[name="mezzo-turno"]').forEach(cb => cb.checked = false);
   document.getElementById('form-mezzo-wrap').style.display = '';
   document.getElementById('form-mezzo-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -2799,36 +2744,7 @@ function chiudiFormMezzo() {
   document.getElementById('form-mezzo-wrap').style.display = 'none';
 }
 
-async function editMezzo(id) {
-  setLoading(true);
-  try {
-    const [{ data: m }, { data: mt }] = await Promise.all([
-      sb.from('MEZZI').select('*').eq('id', id).single(),
-      sb.from('MEZZI_TURNI').select('*').eq('MEZZO_ID', id),
-    ]);
-    if (!m) return;
-    document.getElementById('mezzo-edit-id').value = m.id;
-    document.getElementById('form-mezzo-title').textContent = `Modifica mezzo – ${m['TARGA']}`;
-    document.getElementById('mezzo-targa').value = m['TARGA'] || '';
-    document.getElementById('mezzo-descrizione').value = m['DESCRIZIONE'] || '';
-    document.getElementById('mezzo-tipologia').value = m['TIPOLOGIA'] || '';
-    document.getElementById('mezzo-utilizzo').value = m['UTILIZZO'] || 'VARCHI';
-    document.getElementById('mezzo-sezione').value = m['SEZIONE'] || '';
-    document.getElementById('mezzo-dislocazione').value = m['DISLOCAZIONE'] || '';
-    document.getElementById('mezzo-accesso-porto').checked = !!m['ACCESSO_PORTO'];
-    document.getElementById('mezzo-parcheggio').checked = !!m['PARCHEGGIO'];
-    document.getElementById('mezzo-aut').checked = !!m['AUT'];
-    document.getElementById('mezzo-note').value = m['NOTE'] || '';
-    document.getElementById('mezzo-alert').className = 'form-alert';
-    const turniMezzo = (mt || []).map(x => x['TURNO']);
-    document.querySelectorAll('input[name="mezzo-turno"]').forEach(cb => {
-      cb.checked = turniMezzo.includes(cb.value);
-    });
-    document.getElementById('form-mezzo-wrap').style.display = '';
-    document.getElementById('form-mezzo-wrap').scrollIntoView({ behavior:'smooth', block:'start' });
-  } catch(e) { console.error(e); }
-  finally { setLoading(false); }
-}
+function editMezzo(id) { aprirePannelloMezzo(id); }
 
 async function salvaMezzo() {
   const id          = document.getElementById('mezzo-edit-id').value;
@@ -2842,12 +2758,9 @@ async function salvaMezzo() {
   const parcheggio  = document.getElementById('mezzo-parcheggio').checked;
   const aut         = document.getElementById('mezzo-aut').checked;
   const note        = document.getElementById('mezzo-note').value.trim();
-  const turniSel    = [...document.querySelectorAll('input[name="mezzo-turno"]:checked')].map(cb => cb.value);
-
   if (!targa)       { showFormAlert('mezzo-alert','Inserisci la targa','err'); return; }
   if (!descrizione) { showFormAlert('mezzo-alert','Inserisci la descrizione del mezzo','err'); return; }
   if (!sezione)     { showFormAlert('mezzo-alert','Seleziona la sezione','err'); return; }
-  if (!turniSel.length){ showFormAlert('mezzo-alert','Seleziona almeno un turno','err'); return; }
 
   // Trova varco della sezione (solo se UTILIZZO = VARCHI)
   let varco = null;
@@ -2866,20 +2779,11 @@ async function salvaMezzo() {
 
   setLoading(true);
   try {
-    let mezzoId;
     if (id) {
       const { error } = await sb.from('MEZZI').update(row).eq('id', id);
       if (error) throw error;
-      mezzoId = parseInt(id);
-      await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', mezzoId);
     } else {
       const { data: ins, error } = await sb.from('MEZZI').insert(row).select().single();
-      if (error) throw error;
-      mezzoId = ins.id;
-    }
-    if (turniSel.length) {
-      const mtRows = turniSel.map(t => ({ MEZZO_ID: mezzoId, TURNO: t }));
-      const { error } = await sb.from('MEZZI_TURNI').insert(mtRows);
       if (error) throw error;
     }
     chiudiFormMezzo();
@@ -2891,16 +2795,159 @@ async function salvaMezzo() {
 }
 
 async function deleteMezzo(id, targa) {
-  if (!confirm(`Eliminare il mezzo "${targa}"? Verranno rimosse anche le associazioni ai turni.`)) return;
+  if (!confirm(`Eliminare il mezzo "${targa}"?`)) return;
   setLoading(true);
   try {
-    await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', id);
     await sb.from('MEZZI').delete().eq('id', id);
     await renderInserimentoMezzi();
   } catch(e) { alert('Errore: ' + e.message); }
   finally { setLoading(false); }
 }
 
+
+// ── RICERCA E TABELLA MEZZI ───────────────────────────────────
+function _buildMezziRows(lista) {
+  return lista.map(m => {
+    const utilizzo = m['UTILIZZO'] || 'VARCHI';
+    const uColor = utilizzo === 'VARCHI' ? 'badge-green' : (utilizzo === 'TRASPORTO' || utilizzo === 'TR VOLONTARI') ? 'badge-orange' : 'badge-grey';
+    const noteQ = (m['NOTE'] || '').replace(/"/g, '&quot;');
+    const td = html => `<td>${html}</td>`;
+    const bc = (campo, val) =>
+      `<td style="text-align:center;font-size:15px;cursor:pointer;color:${val?'var(--verde)':'var(--testo3)'}" onclick="toggleBoolMezzo(${m.id},'${campo}',${!!val});event.stopPropagation()" title="Clicca per cambiare">${val?'✓':'✗'}</td>`;
+    return `<tr data-mezzo-id="${m.id}" onclick="aprirePannelloMezzo(${m.id})" style="cursor:pointer">
+      ${td(`<span class="mono" style="font-weight:700">${m['TARGA']}</span>`)}
+      ${td(m['DESCRIZIONE']||'—')}
+      ${td(m['TIPOLOGIA']?`<span class="badge badge-blue">${m['TIPOLOGIA']}</span>`:'—')}
+      ${td(`<span class="badge badge-grey">${m['SEZIONE']||'—'}</span>`)}
+      ${td(`<span class="badge ${uColor}">${utilizzo}</span>`)}
+      ${td(m['DISLOCAZIONE']?`<span class="badge badge-grey">${m['DISLOCAZIONE']}</span>`:'—')}
+      ${bc('ACCESSO_PORTO',m['ACCESSO_PORTO'])}
+      ${bc('PARCHEGGIO',m['PARCHEGGIO'])}
+      ${bc('AUT',m['AUT'])}
+      ${td(`<span title="${noteQ}" style="max-width:120px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m['NOTE']||'—'}</span>`)}
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <button class="btn btn-danger btn-sm" onclick="deleteMezzo(${m.id},'${m['TARGA']}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filtraMezzi() {
+  const q = ((document.getElementById('mezzi-search')||{}).value || '').trim().toLowerCase();
+  const lista = q
+    ? _mezzi.filter(m => ['TARGA','DESCRIZIONE','TIPOLOGIA','SEZIONE','UTILIZZO','DISLOCAZIONE','NOTE'].some(f => (m[f]||'').toLowerCase().includes(q)))
+    : _mezzi;
+
+  const cntEl = document.getElementById('mezzi-counters');
+  if (cntEl && cntEl.style.display !== 'none') {
+    document.getElementById('cnt-mezzi-tot').textContent        = lista.length;
+    document.getElementById('cnt-mezzi-varchi').textContent     = lista.filter(m => m['UTILIZZO'] === 'VARCHI').length;
+    document.getElementById('cnt-mezzi-porto').textContent      = lista.filter(m => m['ACCESSO_PORTO']).length;
+    document.getElementById('cnt-mezzi-parcheggio').textContent = lista.filter(m => m['PARCHEGGIO']).length;
+    document.getElementById('cnt-mezzi-passful').textContent    = lista.filter(m => m['AUT']).length;
+  }
+
+  chiudiPannelloMezzo();
+  const tbody = document.getElementById('tbody-mezzi');
+  if (!lista.length) {
+    tbody.innerHTML = q
+      ? `<tr><td colspan="11" style="text-align:center;color:var(--testo3);padding:20px">Nessun risultato per "<strong>${q}</strong>"</td></tr>`
+      : `<tr><td colspan="11"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = _buildMezziRows(lista);
+}
+
+// ── PANNELLO MODIFICA INLINE MEZZO ───────────────────────────
+function aprirePannelloMezzo(id) {
+  chiudiPannelloMezzo();
+  const m = _mezzi.find(x => x.id === id);
+  if (!m) return;
+  const tr = document.querySelector(`#tbody-mezzi tr[data-mezzo-id="${id}"]`);
+  if (!tr) return;
+  tr.classList.add('selected-for-edit');
+
+  const sel = (elId, opts, val) => `<select id="${elId}" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px">${
+    opts.map(o => `<option value="${o}"${o===(val||'')?'selected':''}>${o||'—'}</option>`).join('')
+  }</select>`;
+  const inp = (elId, val, up) => `<input id="${elId}" type="text" value="${(val||'').replace(/"/g,'&quot;')}" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px${up?';text-transform:uppercase':''}" autocomplete="off">`;
+  const chk = (elId, val, label) => `<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="${elId}"${val?' checked':''} style="width:15px;height:15px;accent-color:var(--verde)">${label}</label>`;
+
+  const lbl = t => `<div style="font-size:11px;font-weight:700;color:var(--testo3);text-transform:uppercase;margin-bottom:4px">${t}</div>`;
+  const sezOpts = ['',..._sezioniList];
+  const tipOpts = ['','FUORISTRADA','AUTOVETTURA','PULMINO','FURGONE','AUTOCARRO','ALTRO'];
+  const utlOpts = ['VARCHI','TR VOLONTARI','SERVIZIO','TRASPORTO','SUPP CUCINA','DISL VOLONTARI'];
+  const dslOpts = ['','PORTO','VARCO','CITTADELLA'];
+
+  const panelRow = document.createElement('tr');
+  panelRow.className = 'inline-edit-row';
+  panelRow.innerHTML = `<td colspan="11" style="padding:0">
+    <div style="background:#f0faf3;border-top:2px solid var(--verde);border-bottom:2px solid var(--verde);padding:16px 20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>${lbl('Targa')}${inp('ie-targa',m['TARGA'],true)}</div>
+        <div>${lbl('Descrizione')}${inp('ie-descrizione',m['DESCRIZIONE'],true)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>${lbl('Tipologia')}${sel('ie-tipologia',tipOpts,m['TIPOLOGIA'])}</div>
+        <div>${lbl('Utilizzo')}${sel('ie-utilizzo',utlOpts,m['UTILIZZO'])}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>${lbl('Sezione')}${sel('ie-sezione',sezOpts,m['SEZIONE'])}</div>
+        <div>${lbl('Dislocazione')}${sel('ie-dislocazione',dslOpts,m['DISLOCAZIONE'])}</div>
+      </div>
+      <div style="display:flex;gap:24px;margin-bottom:12px;flex-wrap:wrap">
+        ${chk('ie-porto',m['ACCESSO_PORTO'],'Accesso Porto')}
+        ${chk('ie-parcheggio',m['PARCHEGGIO'],'Parcheggio')}
+        ${chk('ie-passful',m['AUT'],'Pass Full')}
+      </div>
+      <div style="margin-bottom:14px">${lbl('Note')}<textarea id="ie-note" rows="2" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:inherit;resize:vertical">${m['NOTE']||''}</textarea></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="salvaInlineMezzo(${id})">💾 Salva</button>
+        <button class="btn btn-secondary btn-sm" onclick="chiudiPannelloMezzo()">Annulla</button>
+        <div class="form-alert" id="ie-alert" style="margin:0;flex:1"></div>
+      </div>
+    </div>
+  </td>`;
+  tr.insertAdjacentElement('afterend', panelRow);
+  document.getElementById('ie-targa').focus();
+}
+
+function chiudiPannelloMezzo() {
+  document.querySelector('.inline-edit-row')?.remove();
+  document.querySelectorAll('#tbody-mezzi tr.selected-for-edit').forEach(r => r.classList.remove('selected-for-edit'));
+}
+
+async function salvaInlineMezzo(id) {
+  const targa        = document.getElementById('ie-targa').value.trim().toUpperCase();
+  const descrizione  = document.getElementById('ie-descrizione').value.trim().toUpperCase();
+  const tipologia    = document.getElementById('ie-tipologia').value || null;
+  const utilizzo     = document.getElementById('ie-utilizzo').value || 'VARCHI';
+  const sezione      = document.getElementById('ie-sezione').value || null;
+  const dislocazione = document.getElementById('ie-dislocazione').value || null;
+  const accessoPorto = document.getElementById('ie-porto').checked;
+  const parcheggio   = document.getElementById('ie-parcheggio').checked;
+  const aut          = document.getElementById('ie-passful').checked;
+  const note         = document.getElementById('ie-note').value.trim() || null;
+
+  if (!targa) { showFormAlert('ie-alert','Inserisci la targa','err'); return; }
+
+  let varco = null;
+  if (utilizzo === 'VARCHI' && sezione) {
+    const { data: vx } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sezione).maybeSingle();
+    varco = vx ? vx['VARCO'] : null;
+  }
+
+  const upd = { TARGA: targa, DESCRIZIONE: descrizione, TIPOLOGIA: tipologia, UTILIZZO: utilizzo, SEZIONE: sezione, VARCO: varco, DISLOCAZIONE: dislocazione, ACCESSO_PORTO: accessoPorto, PARCHEGGIO: parcheggio, AUT: aut, NOTE: note };
+  try {
+    const { error } = await sb.from('MEZZI').update(upd).eq('id', id);
+    if (error) throw error;
+    const m = _mezzi.find(x => x.id === id);
+    if (m) Object.assign(m, upd);
+    chiudiPannelloMezzo();
+    showSavedToast('✓ Salvato');
+    filtraMezzi();
+  } catch(e) { showFormAlert('ie-alert','Errore: ' + e.message,'err'); }
+}
 
 // ── MODIFICA INLINE TABELLA MEZZI ────────────────────────────
 async function editCellaMezzo(td, id, campo, currentVal) {
