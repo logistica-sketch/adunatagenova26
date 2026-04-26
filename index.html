@@ -16,6 +16,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root {
   --verde:#1a6e2e; --verde-light:#e6f4ea; --verde-mid:#4caf67;
@@ -1128,7 +1130,19 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
     <div id="tab-sezioni" style="display:none">
       <div class="page-header">
         <div class="page-title">Volontari per Sezione <small>Clicca su una sezione per espandere</small></div>
-        <button class="btn btn-secondary" onclick="renderSezioni()">↻ Aggiorna</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <!-- Pulsanti PDF FULL -->
+          <div id="pdf-full-wrap" style="display:none;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="pdf-sez-sel" style="height:34px;padding:0 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;font-family:inherit">
+              <option value="">Seleziona sezione…</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="scaricaPdfSezione()">📄 Report sezione</button>
+            <button class="btn btn-primary btn-sm" onclick="scaricaPdfTutteSezioni()">📄 Report tutte le sezioni</button>
+          </div>
+          <!-- Pulsante PDF SEZIONALE -->
+          <button class="btn btn-secondary btn-sm" id="pdf-sez-btn" style="display:none" onclick="scaricaPdfMiaSezione()">📄 Scarica il mio Report</button>
+          <button class="btn btn-secondary" onclick="renderSezioni()">↻ Aggiorna</button>
+        </div>
       </div>
       <div id="sezioni-accordion"></div>
     </div>
@@ -1843,6 +1857,21 @@ async function renderSezioni() {
       sezioni = [...new Set([..._sezioniList, ...daVarchi, ...daVol])].sort();
     }
 
+    // Salva sezioni per PDF e aggiorna UI pulsanti
+    _sezioniCorrente = sezioni;
+    const pdfFullWrap = document.getElementById('pdf-full-wrap');
+    const pdfSezBtn   = document.getElementById('pdf-sez-btn');
+    if (isFull) {
+      if (pdfFullWrap) { pdfFullWrap.style.display = 'flex'; }
+      if (pdfSezBtn)   pdfSezBtn.style.display = 'none';
+      const pdfSezSel = document.getElementById('pdf-sez-sel');
+      if (pdfSezSel) pdfSezSel.innerHTML = '<option value="">Seleziona sezione…</option>' +
+        sezioni.map(s => `<option value="${s}">${s}</option>`).join('');
+    } else {
+      if (pdfFullWrap) pdfFullWrap.style.display = 'none';
+      if (pdfSezBtn)   pdfSezBtn.style.display = '';
+    }
+
     const container = document.getElementById('sezioni-accordion');
     if (!sezioni.length) {
       container.innerHTML = '<div class="empty-state"><div class="ei">🗂️</div><p>Nessuna sezione trovata.</p></div>';
@@ -1927,6 +1956,122 @@ function switchSezTab(sezId, tab) {
   document.getElementById('panel-mez-' + sezId).style.display = tab === 'mez' ? '' : 'none';
   document.getElementById('tab-vol-' + sezId).className = 'sez-tab' + (tab==='vol'?' active':'');
   document.getElementById('tab-mez-' + sezId).className = 'sez-tab' + (tab==='mez'?' active':'');
+}
+
+// ── REPORT PDF SEZIONI ────────────────────────────────────────
+function scaricaPdfTutteSezioni() {
+  if (!_sezioniCorrente.length) { alert('Nessuna sezione caricata. Aggiorna prima la pagina.'); return; }
+  _generaPdf(_sezioniCorrente);
+}
+
+function scaricaPdfSezione() {
+  const sez = (document.getElementById('pdf-sez-sel') || {}).value;
+  if (!sez) { alert('Seleziona una sezione dall\'elenco.'); return; }
+  _generaPdf([sez]);
+}
+
+function scaricaPdfMiaSezione() {
+  const sez = CU && CU['SEZIONE'];
+  if (!sez) { alert('Sezione non trovata.'); return; }
+  _generaPdf([sez]);
+}
+
+function _generaPdf(sezioni) {
+  if (typeof window.jspdf === 'undefined') { alert('Libreria PDF non caricata. Verifica la connessione internet.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const verde = [26, 110, 46];
+  const W = 182; // larghezza utile (A4 = 210 - 14*2)
+
+  sezioni.forEach((sez, idx) => {
+    if (idx > 0) doc.addPage();
+    let y = 14;
+
+    // ── Intestazione ──────────────────────────────────────────
+    doc.setFillColor(...verde);
+    doc.rect(14, y, W, 10, 'F');
+    doc.setFontSize(10); doc.setTextColor(255,255,255); doc.setFont(undefined, 'bold');
+    doc.text('97ª ADUNATA NAZIONALE ALPINI – GENOVA 2026', 14 + W/2, y + 6.5, { align:'center' });
+    y += 14;
+
+    doc.setTextColor(0,0,0); doc.setFontSize(16);
+    doc.text(`SEZIONE: ${sez}`, 14 + W/2, y, { align:'center' });
+    y += 6;
+
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.text(`Stampato il: ${oggi}`, 14 + W/2, y, { align:'center' });
+    y += 8;
+
+    // ── Volontari ─────────────────────────────────────────────
+    const volSez = _volontari.filter(v => v['SEZIONE'] === sez);
+    const principali = volSez.filter(v => !v['JOLLY'] && v['VARCO']);
+    const extra      = volSez.filter(v =>  v['JOLLY'] || !v['VARCO']);
+
+    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.setTextColor(...verde);
+    doc.text(`VOLONTARI (${volSez.length})`, 14, y);
+    doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
+    y += 4;
+
+    const volRows = [...principali, ...extra].map(v => {
+      const turnoObj  = (_turni||[]).find(t => t['Etichetta'] === v['TURNO']);
+      const turnoStr  = turnoObj ? (turnoObj['NOME TURNO'] || v['TURNO']) : (v['TURNO'] || '—');
+      const varcoRiga = (_varchi||[]).find(vx => vx['VARCO'] == v['VARCO']);
+      const varcoStr  = v['VARCO'] != null ? `${v['VARCO']}` : (v['JOLLY'] ? 'JOLLY' : '—');
+      const indir     = varcoRiga ? (varcoRiga['INDIRIZZO'] || '—') : '—';
+      return [v['NOME_COGNOME']||'—', turnoStr, varcoStr, indir, v['TELEFONO']||'—'];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [['Nome Cognome', 'Turno', 'Varco', 'Indirizzo Varco', 'Telefono']],
+      body: volRows.length ? volRows : [['Nessun volontario','','','','']],
+      styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
+      headStyles: { fillColor: verde, fontStyle: 'bold', fontSize: 8.5 },
+      columnStyles: { 0:{cellWidth:52}, 1:{cellWidth:28}, 2:{cellWidth:14}, 3:{cellWidth:58}, 4:{cellWidth:30} },
+      margin: { left: 14, right: 14 },
+      didDrawPage: (d) => { y = d.cursor.y; },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+
+    // ── Mezzi ─────────────────────────────────────────────────
+    const mezSez = (_mezzi||[]).filter(m => m['SEZIONE'] === sez);
+
+    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.setTextColor(...verde);
+    doc.text(`MEZZI (${mezSez.length})`, 14, y);
+    doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
+    y += 4;
+
+    const mezRows = mezSez.map(m => [
+      m['TARGA']||'—', m['DESCRIZIONE']||'—', m['TIPOLOGIA']||'—',
+      m['UTILIZZO']||'—', m['VARCO'] != null ? `${m['VARCO']}` : '—', m['DISLOCAZIONE']||'—',
+    ]);
+
+    doc.autoTable({
+      startY: y,
+      head: [['Targa','Descrizione','Tipologia','Utilizzo','Varco','Dislocazione']],
+      body: mezRows.length ? mezRows : [['Nessun mezzo','','','','','']],
+      styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
+      headStyles: { fillColor: verde, fontStyle: 'bold', fontSize: 8.5 },
+      columnStyles: { 0:{cellWidth:24}, 1:{cellWidth:46}, 2:{cellWidth:26}, 3:{cellWidth:28}, 4:{cellWidth:16}, 5:{cellWidth:26} },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+
+    // ── Riepilogo ─────────────────────────────────────────────
+    const totVarchi = mezSez.filter(m => m['UTILIZZO'] === 'VARCHI').length;
+    doc.setFontSize(9); doc.setFont(undefined, 'bold');
+    doc.text('RIEPILOGO', 14, y); y += 5;
+    doc.setFont(undefined, 'normal');
+    doc.text(`Volontari: ${volSez.length}  |  Principali: ${principali.length}  |  Extra / Jolly: ${extra.length}`, 14, y); y += 4.5;
+    doc.text(`Mezzi: ${mezSez.length}  |  Ai varchi: ${totVarchi}`, 14, y);
+  });
+
+  const tag  = sezioni.length === 1 ? sezioni[0].replace(/\s+/g,'_') : 'TUTTE';
+  const data = oggi.replace(/\//g,'-');
+  doc.save(`report_${tag}_${data}.pdf`);
 }
 
 async function deleteVolontario(id) {
@@ -2670,6 +2815,7 @@ async function salvaVolontari() {
 //  INSERIMENTO MEZZI
 // ══════════════════════════════════════════════════════════════
 let _sezioniList = [];
+let _sezioniCorrente = [];
 
 async function loadSezioniList(force = false) {
   if (_sezioniList.length && !force) return;
