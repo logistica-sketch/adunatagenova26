@@ -3042,9 +3042,9 @@ async function importaMezziExcel(input) {
     const data = await file.arrayBuffer();
     const wb   = XLSX.read(data, { type: 'array' });
     const ws   = wb.Sheets[wb.SheetNames[0]];
-    // Legge tutte le righe; salta header (prima riga)
+    // Riga 0 = titolo, riga 1 = intestazioni, riga 2+ = dati
     const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    const dataRows = raw.slice(1).filter(r => String(r[0] || '').trim());
+    const dataRows = raw.slice(2).filter(r => String(r[0] || '').trim());
 
     if (!dataRows.length) {
       alertEl.className = 'form-alert show err';
