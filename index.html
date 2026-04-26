@@ -1281,7 +1281,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         <div class="form-alert" id="import-mezzi-alert" style="margin:8px 16px 0;display:none"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Targa</th><th>Descrizione</th><th>Tipologia</th><th>Utilizzo</th><th>Sezione</th><th>Dislocazione</th><th>Turni</th><th>Note</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>Targa</th><th>Descrizione</th><th>Tipologia</th><th>Sezione</th><th>Utilizzo</th><th>Dislocazione</th><th title="Accesso Porto">Porto</th><th>Parcheggio</th><th>AUT</th><th>Note</th><th></th></tr></thead>
             <tbody id="tbody-mezzi"></tbody>
           </table>
         </div>
@@ -2022,15 +2022,19 @@ function renderTurnoAttivo() {
     return vol['VARCO'] != varcoSez['VARCO'];
   }
 
-  // Logica posizionale mezzi: primo mezzo per varco = principale, dal 2° = extra
-  function splitMezziVarco(varcoNum) {
-    let tutti = mezziTurno.filter(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == varcoNum && mt['MEZZI']['UTILIZZO'] === 'VARCHI').sort((a,b) => a.id - b.id);
-    if (isSez) tutti = tutti.filter(mt => mt['MEZZI']['SEZIONE'] === miaSez);
-    return { principale: tutti.slice(0, 1), extra: tutti.slice(1) };
+  // Mezzi VARCHI per varco: lookup diretto da _mezzi per SEZIONE, indipendente dal turno
+  function getMezziVarco(varcoNum) {
+    const sezVarco = ((_varchi.find(vx => vx['VARCO'] == varcoNum) || {})['SEZIONI'] || '').trim().toUpperCase();
+    let tutti = _mezzi.filter(m => {
+      if (m['UTILIZZO'] !== 'VARCHI') return false;
+      const sezM = (m['SEZIONE'] || '').trim().toUpperCase();
+      return (sezVarco && sezM === sezVarco) || m['VARCO'] == varcoNum;
+    });
+    if (isSez) tutti = tutti.filter(m => (m['SEZIONE'] || '') === miaSez);
+    return tutti;
   }
 
-  let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0;
-  let totMezziPrinc=0, totMezziExtra=0;
+  let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totMezziGriglia=0;
   _varchi.forEach(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
     if (principali.length >= 2) completi++;
@@ -2038,9 +2042,7 @@ function renderTurnoAttivo() {
     else scoperti++;
     if (extra.length > 0) surplus++;
     totPrinc += principali.length;
-    const { principale: mp, extra: me } = splitMezziVarco(v['VARCO']);
-    totMezziPrinc += mp.length;
-    totMezziExtra += me.length;
+    totMezziGriglia += getMezziVarco(v['VARCO']).length;
   });
   // EXTRA = tutti i non-principali: JOLLY=true (surplus in varco) + VARCO=null (pool non assegnati)
   const totExtra = volTurno.filter(v => v['JOLLY'] === true || !v['VARCO']).length;
@@ -2050,11 +2052,11 @@ function renderTurnoAttivo() {
   document.getElementById('turno-stats').innerHTML = `
     <div class="ts-card"><div class="ts-num">${_varchi.length}</div><div class="ts-label">Tot. Varchi</div></div>
     <div class="ts-card"><div class="ts-num blu">${totPrinc} / ${totSlot}</div><div class="ts-label">Slot coperti</div></div>
-    <div class="ts-card"><div class="ts-num blu">${totMezziPrinc} / ${_varchi.length}</div><div class="ts-label">Mezzi</div></div>
+    <div class="ts-card"><div class="ts-num blu">${totMezziGriglia} / ${_varchi.length}</div><div class="ts-label">Mezzi</div></div>
     <div class="ts-card"><div class="ts-num verde">${completi}</div><div class="ts-label">Completi</div></div>
     <div class="ts-card"><div class="ts-num arancio">${parziali}</div><div class="ts-label">Parziali</div></div>
     <div class="ts-card"><div class="ts-num rosso">${scoperti}</div><div class="ts-label">Scoperti</div></div>
-    <div class="ts-card"><div class="ts-num arancio">${totExtra + totMezziExtra}</div><div class="ts-label">Extra</div></div>
+    <div class="ts-card"><div class="ts-num arancio">${totExtra}</div><div class="ts-label">Extra</div></div>
   `;
 
   const tbody = document.getElementById('varchi-tbody');
@@ -2108,30 +2110,17 @@ function renderTurnoAttivo() {
          </div>`
       : (isSez && principali.length < 2 ? `<span class="slot-vuoto-readonly">slot vuoto</span>` : '');
 
-    function buildMezzoChip(mt, isExtra) {
-      const m = mt['MEZZI'];
-      const badge = isExtra ? '<div class="mc-badge-extra">EXTRA</div>' : '';
-      const sezLine = `<div class="mc-sez">Sez: ${m['SEZIONE'] || '—'}</div>`;
-      if (isSez) {
-        return `<div class="mezzo-chip readonly${isExtra ? ' extra' : ''}">
-          <div class="mc-targa">${m['TARGA']}${m['DESCRIZIONE'] ? ' – ' + m['DESCRIZIONE'] : ''}</div>
-          <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
-          ${sezLine}${badge}
-        </div>`;
-      }
-      return `<div class="mezzo-chip${isExtra ? ' extra' : ''}" draggable="true" ondragstart="dragStart(event,'mezzo',${mt.id})">
+    function buildMezzoChip(m) {
+      return `<div class="mezzo-chip${isSez ? ' readonly' : ''}">
         <div class="mc-targa">${m['TARGA']}${m['DESCRIZIONE'] ? ' – ' + m['DESCRIZIONE'] : ''}</div>
         <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
-        ${sezLine}${badge}
-        <button class="mc-remove" onclick="rimuoviMezzo(${mt.id})" title="Rimuovi">✕</button>
+        <div class="mc-sez">Sez: ${m['SEZIONE'] || '—'}</div>
       </div>`;
     }
-    const chipsMP = mezziP.map(mt => buildMezzoChip(mt, false)).join('');
-    const chipsME = mezziE.map(mt => buildMezzoChip(mt, true)).join('');
-    const addMezzoBtn = !isSez
-      ? `<span class="nessun-mezzo" onclick="openAssegnaMezzo(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">+ ${mezziP.length + mezziE.length === 0 ? 'NESSUN MEZZO' : 'AGGIUNGI'}</span>`
-      : (mezziP.length + mezziE.length === 0 ? `<span class="nessun-mezzo-readonly">—</span>` : '');
-    const mezzoHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">${chipsMP}${chipsME}${addMezzoBtn}</div>`;
+    const mezziVarco = getMezziVarco(v['VARCO']);
+    const mezzoHtml = `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">${
+      mezziVarco.length ? mezziVarco.map(m => buildMezzoChip(m)).join('') : '<span class="nessun-mezzo-readonly">—</span>'
+    }</div>`;
 
     const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
     const dropAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
@@ -2144,7 +2133,7 @@ function renderTurnoAttivo() {
           ${chipsP}${chipsE}${slotVuoto}
         </div>
       </td>
-      <td class="td-mezzo" style="vertical-align:top" ${dropAttrs}>${mezzoHtml}</td>
+      <td class="td-mezzo" style="vertical-align:top">${mezzoHtml}</td>
       <td class="td-stato">${statoHtml}</td>
     </tr>`;
   }).join('');
@@ -2727,29 +2716,35 @@ async function renderInserimentoMezzi() {
     const importBtn = document.getElementById('import-mezzi-btn');
     if (importBtn) importBtn.style.display = isFull ? '' : 'none';
 
-    // Popola tabella mezzi
+    // Popola tabella mezzi con celle inline-editabili
     const tbody = document.getElementById('tbody-mezzi');
     if (!mezzi || !mezzi.length) {
-      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
       return;
     }
     tbody.innerHTML = mezzi.map(m => {
-      const turniMezzo = (mezziTurni || []).filter(mt => mt['MEZZO_ID'] === m.id).map(mt => mt['TURNO']);
       const utilizzo = m['UTILIZZO'] || 'VARCHI';
-      const utilizzoColor = utilizzo === 'VARCHI' ? 'badge-green' : (utilizzo === 'TRASPORTO' || utilizzo === 'TR VOLONTARI') ? 'badge-orange' : 'badge-grey';
-      const noteText = (m['NOTE'] || '').replace(/"/g, '&quot;');
+      const uColor = utilizzo === 'VARCHI' ? 'badge-green' : (utilizzo === 'TRASPORTO' || utilizzo === 'TR VOLONTARI') ? 'badge-orange' : 'badge-grey';
+      const noteQ = (m['NOTE'] || '').replace(/"/g, '&quot;');
+      const valQ = v => JSON.stringify(v ?? '').replace(/'/g, "&#39;");
+      const ec = (campo, html, val) =>
+        `<td onclick="editCellaMezzo(this,${m.id},'${campo}',${valQ(val)})" style="cursor:pointer" title="Clicca per modificare">${html}</td>`;
+      const bc = (campo, val) =>
+        `<td style="text-align:center;font-size:15px;cursor:pointer;color:${val?'var(--verde)':'var(--testo3)'}" onclick="toggleBoolMezzo(${m.id},'${campo}',${!!val})" title="Clicca per cambiare">${val?'✓':'✗'}</td>`;
       return `<tr>
-        <td><span class="mono" style="font-weight:700">${m['TARGA']}</span></td>
-        <td>${m['DESCRIZIONE'] || '—'}</td>
-        <td>${m['TIPOLOGIA'] ? `<span class="badge badge-blue">${m['TIPOLOGIA']}</span>` : '—'}</td>
-        <td><span class="badge ${utilizzoColor}">${utilizzo}</span></td>
-        <td><span class="badge badge-grey">${m['SEZIONE'] || '—'}</span></td>
-        <td>${m['DISLOCAZIONE'] ? `<span class="badge badge-grey">${m['DISLOCAZIONE']}</span>` : '—'}</td>
-        <td style="font-size:12px">${turniMezzo.length ? turniMezzo.join(', ') : '<span style="color:var(--testo3)">Nessuno</span>'}</td>
-        <td style="font-size:12px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${noteText}">${m['NOTE'] || '—'}</td>
+        ${ec('TARGA',`<span class="mono" style="font-weight:700">${m['TARGA']}</span>`,m['TARGA'])}
+        ${ec('DESCRIZIONE',m['DESCRIZIONE']||'<span style="color:var(--testo3)">—</span>',m['DESCRIZIONE'])}
+        ${ec('TIPOLOGIA',m['TIPOLOGIA']?`<span class="badge badge-blue">${m['TIPOLOGIA']}</span>`:'—',m['TIPOLOGIA'])}
+        ${ec('SEZIONE',`<span class="badge badge-grey">${m['SEZIONE']||'—'}</span>`,m['SEZIONE'])}
+        ${ec('UTILIZZO',`<span class="badge ${uColor}">${utilizzo}</span>`,utilizzo)}
+        ${ec('DISLOCAZIONE',m['DISLOCAZIONE']?`<span class="badge badge-grey">${m['DISLOCAZIONE']}</span>`:'—',m['DISLOCAZIONE'])}
+        ${bc('ACCESSO_PORTO',m['ACCESSO_PORTO'])}
+        ${bc('PARCHEGGIO',m['PARCHEGGIO'])}
+        ${bc('AUT',m['AUT'])}
+        ${ec('NOTE',`<span style="max-width:120px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${noteQ}">${m['NOTE']||'—'}</span>`,m['NOTE'])}
         <td style="white-space:nowrap">
-          <button class="btn btn-ghost" onclick="editMezzo(${m.id})">Modifica</button>
-          <button class="btn btn-danger" onclick="deleteMezzo(${m.id},'${m['TARGA']}')">Rimuovi</button>
+          <button class="btn btn-ghost btn-sm" onclick="editMezzo(${m.id});event.stopPropagation()" title="Form completo">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMezzo(${m.id},'${m['TARGA']}');event.stopPropagation()">✕</button>
         </td>
       </tr>`;
     }).join('');
@@ -2886,6 +2881,86 @@ async function deleteMezzo(id, targa) {
   finally { setLoading(false); }
 }
 
+
+// ── MODIFICA INLINE TABELLA MEZZI ────────────────────────────
+async function editCellaMezzo(td, id, campo, currentVal) {
+  if (td.querySelector('input,select,textarea')) return;
+  const opzioni = {
+    TIPOLOGIA:    ['','FUORISTRADA','AUTOVETTURA','PULMINO','FURGONE','AUTOCARRO','ALTRO'],
+    UTILIZZO:     ['VARCHI','TR VOLONTARI','SERVIZIO','TRASPORTO','SUPP CUCINA','DISL VOLONTARI'],
+    DISLOCAZIONE: ['','PORTO','VARCO','CITTADELLA'],
+  };
+  const origHTML = td.innerHTML;
+  let widget;
+  if (campo === 'SEZIONE') {
+    widget = document.createElement('select');
+    ['', ..._sezioniList].forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o; opt.textContent = o || '—';
+      if (o === (currentVal || '')) opt.selected = true;
+      widget.appendChild(opt);
+    });
+  } else if (opzioni[campo]) {
+    widget = document.createElement('select');
+    opzioni[campo].forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o; opt.textContent = o || '—';
+      if (o === (currentVal || '')) opt.selected = true;
+      widget.appendChild(opt);
+    });
+  } else {
+    widget = document.createElement('input');
+    widget.type = 'text';
+    widget.value = currentVal || '';
+    if (campo === 'TARGA' || campo === 'DESCRIZIONE') widget.style.textTransform = 'uppercase';
+  }
+  widget.style.cssText = 'width:100%;min-width:70px;padding:2px 6px;border:1.5px solid var(--verde);border-radius:4px;font-size:12px;font-family:inherit;box-sizing:border-box';
+  td.innerHTML = '';
+  td.appendChild(widget);
+  widget.focus();
+  let saved = false;
+  async function salva() {
+    if (saved) return; saved = true;
+    let val = (widget.tagName === 'SELECT' ? widget.value : widget.value.trim()) || null;
+    if (campo === 'TARGA' || campo === 'DESCRIZIONE') val = (val || '').toUpperCase() || null;
+    try {
+      const upd = { [campo]: val };
+      // Se SEZIONE o UTILIZZO cambia, ricalcola VARCO
+      if (campo === 'SEZIONE' || campo === 'UTILIZZO') {
+        const m = _mezzi.find(x => x.id === id);
+        const util = campo === 'UTILIZZO' ? (val || 'VARCHI') : (m?.['UTILIZZO'] || 'VARCHI');
+        const sez  = campo === 'SEZIONE'  ? (val || '') : (m?.['SEZIONE'] || '');
+        if (util === 'VARCHI' && sez) {
+          const { data: vx } = await sb.from('VARCHI').select('VARCO').eq('SEZIONI', sez).maybeSingle();
+          upd['VARCO'] = vx ? vx['VARCO'] : null;
+        } else { upd['VARCO'] = null; }
+      }
+      const { error } = await sb.from('MEZZI').update(upd).eq('id', id);
+      if (error) throw error;
+      const m = _mezzi.find(x => x.id === id);
+      if (m) Object.assign(m, upd);
+      showSavedToast('✓ Salvato');
+      await renderInserimentoMezzi();
+    } catch(e) { saved = false; td.innerHTML = origHTML; alert('Errore: ' + e.message); }
+  }
+  widget.addEventListener('blur', salva);
+  widget.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); widget.blur(); }
+    if (e.key === 'Escape') { saved = true; td.innerHTML = origHTML; }
+  });
+}
+
+async function toggleBoolMezzo(id, campo, currentVal) {
+  const newVal = !currentVal;
+  try {
+    const { error } = await sb.from('MEZZI').update({ [campo]: newVal }).eq('id', id);
+    if (error) throw error;
+    const m = _mezzi.find(x => x.id === id);
+    if (m) m[campo] = newVal;
+    showSavedToast('✓ Salvato');
+    await renderInserimentoMezzi();
+  } catch(e) { alert('Errore: ' + e.message); }
+}
 
 // ── IMPORTAZIONE EXCEL MEZZI ──────────────────────────────────
 async function importaMezziExcel(input) {
