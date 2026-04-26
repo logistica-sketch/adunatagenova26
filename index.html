@@ -2071,7 +2071,6 @@ function renderTurnoAttivo() {
   const tbody = document.getElementById('varchi-tbody');
   tbody.innerHTML = _varchi.map(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
-    const { principale: mezziP, extra: mezziE } = splitMezziVarco(v['VARCO']);
 
     let statoHtml;
     if (extra.length > 0 && principali.length >= 2)
