@@ -1262,8 +1262,17 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         <div class="page-title">Inserimento Mezzi <small id="mezzi-sezione-label">Sezione: —</small></div>
       </div>
 
-      <div style="background:var(--blu-light);border:1px solid #c0d4f5;border-radius:var(--r);padding:14px 18px;margin-bottom:24px;font-size:13px;color:var(--blu);">
+      <div style="background:var(--blu-light);border:1px solid #c0d4f5;border-radius:var(--r);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--blu);">
         <strong>Come funziona:</strong> Inserisci i mezzi della tua sezione. Ogni mezzo viene assegnato automaticamente al varco della sezione. Seleziona i turni in cui il mezzo sarà disponibile.
+      </div>
+
+      <!-- Contatori mezzi -->
+      <div id="mezzi-counters" style="display:none;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px">
+        <div class="ts-card"><div class="ts-num" id="cnt-mezzi-tot">—</div><div class="ts-label">Totale mezzi</div></div>
+        <div class="ts-card"><div class="ts-num verde" id="cnt-mezzi-varchi">—</div><div class="ts-label">Ai varchi</div></div>
+        <div class="ts-card"><div class="ts-num blu" id="cnt-mezzi-porto">—</div><div class="ts-label">Accesso porto</div></div>
+        <div class="ts-card"><div class="ts-num blu" id="cnt-mezzi-parcheggio">—</div><div class="ts-label">Parcheggio</div></div>
+        <div class="ts-card"><div class="ts-num blu" id="cnt-mezzi-passful">—</div><div class="ts-label">Pass Full</div></div>
       </div>
 
       <!-- LISTA MEZZI ESISTENTI -->
@@ -1281,7 +1290,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
         <div class="form-alert" id="import-mezzi-alert" style="margin:8px 16px 0;display:none"></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Targa</th><th>Descrizione</th><th>Tipologia</th><th>Sezione</th><th>Utilizzo</th><th>Dislocazione</th><th title="Accesso Porto">Porto</th><th>Parcheggio</th><th>AUT</th><th>Note</th><th></th></tr></thead>
+            <thead><tr><th>Targa</th><th>Descrizione</th><th>Tipologia</th><th>Sezione</th><th>Utilizzo</th><th>Dislocazione</th><th title="Accesso Porto">Porto</th><th>Parcheggio</th><th>Pass Full</th><th>Note</th><th></th></tr></thead>
             <tbody id="tbody-mezzi"></tbody>
           </table>
         </div>
@@ -1366,7 +1375,7 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
                   </label>
                   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
                     <input type="checkbox" id="mezzo-aut" style="width:16px;height:16px;accent-color:var(--verde)">
-                    AUT
+                    Pass Full
                   </label>
                 </div>
               </div>
@@ -2716,9 +2725,21 @@ async function renderInserimentoMezzi() {
     const importBtn = document.getElementById('import-mezzi-btn');
     if (importBtn) importBtn.style.display = isFull ? '' : 'none';
 
+    // Contatori in cima
+    const allM = mezzi || [];
+    const cntEl = document.getElementById('mezzi-counters');
+    if (cntEl) {
+      cntEl.style.display = 'grid';
+      document.getElementById('cnt-mezzi-tot').textContent       = allM.length;
+      document.getElementById('cnt-mezzi-varchi').textContent    = allM.filter(m => m['UTILIZZO'] === 'VARCHI').length;
+      document.getElementById('cnt-mezzi-porto').textContent     = allM.filter(m => m['ACCESSO_PORTO']).length;
+      document.getElementById('cnt-mezzi-parcheggio').textContent= allM.filter(m => m['PARCHEGGIO']).length;
+      document.getElementById('cnt-mezzi-passful').textContent   = allM.filter(m => m['AUT']).length;
+    }
+
     // Popola tabella mezzi con celle inline-editabili
     const tbody = document.getElementById('tbody-mezzi');
-    if (!mezzi || !mezzi.length) {
+    if (!allM.length) {
       tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="ei">🚗</div><p>Nessun mezzo registrato.</p></div></td></tr>`;
       return;
     }
