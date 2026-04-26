@@ -1994,18 +1994,18 @@ function _generaPdf(sezioni) {
 
     // ── Intestazione ──────────────────────────────────────────
     doc.setFillColor(...verde);
-    doc.rect(14, y, W, 10, 'F');
-    doc.setFontSize(10); doc.setTextColor(255,255,255); doc.setFont(undefined, 'bold');
-    doc.text('97ª ADUNATA NAZIONALE ALPINI – GENOVA 2026', 14 + W/2, y + 6.5, { align:'center' });
-    y += 14;
+    doc.rect(14, y, W, 12, 'F');
+    doc.setFontSize(11); doc.setTextColor(255,255,255); doc.setFont(undefined, 'bold');
+    doc.text('97ª ADUNATA NAZIONALE ALPINI – GENOVA 2026', 14 + W/2, y + 7.5, { align:'center' });
+    y += 20;                                         // +6 rispetto a prima (era 14)
 
-    doc.setTextColor(0,0,0); doc.setFontSize(16);
+    doc.setTextColor(0,0,0); doc.setFontSize(18); doc.setFont(undefined, 'bold');
     doc.text(`SEZIONE: ${sez}`, 14 + W/2, y, { align:'center' });
-    y += 6;
+    y += 10;                                         // +4 rispetto a prima (era 6)
 
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
     doc.text(`Stampato il: ${oggi}`, 14 + W/2, y, { align:'center' });
-    y += 8;
+    y += 14;                                         // +6 rispetto a prima (era 8)
 
     // ── Volontari ─────────────────────────────────────────────
     const sezLow    = sez.trim().toLowerCase();
@@ -2013,11 +2013,11 @@ function _generaPdf(sezioni) {
     const principali = volSez.filter(v => !v['JOLLY'] && v['VARCO']);
     const extra      = volSez.filter(v =>  v['JOLLY'] || !v['VARCO']);
 
-    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.setFontSize(12); doc.setFont(undefined, 'bold');
     doc.setTextColor(...verde);
     doc.text(`VOLONTARI (${volSez.length})`, 14, y);
     doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
-    y += 4;
+    y += 8;                                          // +4 rispetto a prima (era 4)
 
     const volRows = [...principali, ...extra].map(v => {
       const turnoObj  = _turniPerPdf.find(t => t['Etichetta'] === v['TURNO']);
@@ -2038,16 +2038,16 @@ function _generaPdf(sezioni) {
       margin: { left: 14, right: 14 },
       didDrawPage: (d) => { y = d.cursor.y; },
     });
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 14;              // +6 tra tabella vol e sezione mezzi
 
     // ── Mezzi ─────────────────────────────────────────────────
     const mezSez = _mezziPerPdf.filter(m => (m['SEZIONE']||'').trim().toLowerCase() === sezLow);
 
-    doc.setFontSize(11); doc.setFont(undefined, 'bold');
+    doc.setFontSize(12); doc.setFont(undefined, 'bold');
     doc.setTextColor(...verde);
     doc.text(`MEZZI (${mezSez.length})`, 14, y);
     doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
-    y += 4;
+    y += 8;                                          // +4 tra titolo mezzi e tabella
 
     const mezRows = mezSez.map(m => [
       m['TARGA']||'—', m['DESCRIZIONE']||'—', m['TIPOLOGIA']||'—',
@@ -2063,7 +2063,7 @@ function _generaPdf(sezioni) {
       columnStyles: { 0:{cellWidth:24}, 1:{cellWidth:46}, 2:{cellWidth:26}, 3:{cellWidth:28}, 4:{cellWidth:16}, 5:{cellWidth:26} },
       margin: { left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 8;
+    y = doc.lastAutoTable.finalY + 14;              // +6 tra tabella mezzi e riepilogo
 
     // ── Riepilogo ─────────────────────────────────────────────
     const totVarchi = mezSez.filter(m => m['UTILIZZO'] === 'VARCHI').length;
