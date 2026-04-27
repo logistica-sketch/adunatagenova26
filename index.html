@@ -1982,42 +1982,62 @@ function scaricaPdfMiaSezione() {
 
 async function _generaPdf(sezioni) {
   if (typeof window.jspdf === 'undefined') { alert('Libreria PDF non caricata. Verifica la connessione internet.'); return; }
+
+  // ── Query fresche al momento della generazione ─────────────
   setLoading(true);
+  let volontari, mezzi, varchi, turni;
   try {
-    // Ricarica mezzi freschi dal DB per avere VARCO sempre aggiornato
-    const { data: mezziAggiornati } = await sb.from('MEZZI').select('*');
-    if (mezziAggiornati) _mezziPerPdf = mezziAggiornati;
-  } catch(e) { console.warn('PDF: impossibile aggiornare mezzi:', e); }
-  finally { setLoading(false); }
+    const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
+    const miaSez = CU['SEZIONE'] || '';
+    const [r1, r2, r3, r4] = await Promise.all([
+      isFull
+        ? sb.from('VOLONTARI').select('*')
+        : sb.from('VOLONTARI').select('*').eq('SEZIONE', miaSez),
+      isFull
+        ? sb.from('MEZZI').select('*')
+        : sb.from('MEZZI').select('*').eq('SEZIONE', miaSez),
+      sb.from('VARCHI').select('*'),
+      sb.from('TURNI').select('*'),
+    ]);
+    volontari = r1.data || [];
+    mezzi     = r2.data || [];
+    varchi    = r3.data || [];
+    turni     = r4.data || [];
+  } catch(e) {
+    setLoading(false);
+    alert('Errore nel caricamento dati per il PDF: ' + e.message);
+    return;
+  }
+  setLoading(false);
 
   const { jsPDF } = window.jspdf;
   const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
   const verde = [26, 110, 46];
-  const W = 182; // larghezza utile (A4 = 210 - 14*2)
+  const W = 182;
 
   sezioni.forEach((sez, idx) => {
     if (idx > 0) doc.addPage();
     let y = 14;
+    const sezLow = sez.trim().toLowerCase();
 
     // ── Intestazione ──────────────────────────────────────────
     doc.setFillColor(...verde);
     doc.rect(14, y, W, 12, 'F');
     doc.setFontSize(11); doc.setTextColor(255,255,255); doc.setFont(undefined, 'bold');
     doc.text('97ª ADUNATA NAZIONALE ALPINI – GENOVA 2026', 14 + W/2, y + 7.5, { align:'center' });
-    y += 20;                                         // +6 rispetto a prima (era 14)
+    y += 20;
 
     doc.setTextColor(0,0,0); doc.setFontSize(18); doc.setFont(undefined, 'bold');
     doc.text(`SEZIONE: ${sez}`, 14 + W/2, y, { align:'center' });
-    y += 10;                                         // +4 rispetto a prima (era 6)
+    y += 10;
 
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
     doc.text(`Stampato il: ${oggi}`, 14 + W/2, y, { align:'center' });
-    y += 14;                                         // +6 rispetto a prima (era 8)
+    y += 14;
 
     // ── Volontari ─────────────────────────────────────────────
-    const sezLow    = sez.trim().toLowerCase();
-    const volSez    = _volontariPerPdf.filter(v => (v['SEZIONE']||'').trim().toLowerCase() === sezLow);
+    const volSez    = volontari.filter(v => (v['SEZIONE']||'').trim().toLowerCase() === sezLow);
     const principali = volSez.filter(v => !v['JOLLY'] && v['VARCO']);
     const extra      = volSez.filter(v =>  v['JOLLY'] || !v['VARCO']);
 
@@ -2025,12 +2045,12 @@ async function _generaPdf(sezioni) {
     doc.setTextColor(...verde);
     doc.text(`VOLONTARI (${volSez.length})`, 14, y);
     doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
-    y += 8;                                          // +4 rispetto a prima (era 4)
+    y += 8;
 
     const volRows = [...principali, ...extra].map(v => {
-      const turnoObj  = _turniPerPdf.find(t => t['Etichetta'] === v['TURNO']);
-      const turnoStr  = turnoObj ? (turnoObj['NOME TURNO'] || v['TURNO']) : (v['TURNO'] || '—');
-      const varcoRiga = _varchiPerPdf.find(vx => vx['VARCO'] == v['VARCO']);
+      const turnoObj = turni.find(t => t['Etichetta'] === v['TURNO']);
+      const turnoStr = turnoObj ? (turnoObj['NOME TURNO'] || v['TURNO']) : (v['TURNO'] || '—');
+      const varcoRiga = varchi.find(vx => vx['VARCO'] == v['VARCO']);
       const varcoStr  = v['VARCO'] != null ? `${v['VARCO']}` : (v['JOLLY'] ? 'JOLLY' : '—');
       const indir     = varcoRiga ? (varcoRiga['INDIRIZZO'] || '—') : '—';
       return [v['NOME_COGNOME']||'—', turnoStr, varcoStr, indir, v['TELEFONO']||'—'];
@@ -2046,32 +2066,38 @@ async function _generaPdf(sezioni) {
       margin: { left: 14, right: 14 },
       didDrawPage: (d) => { y = d.cursor.y; },
     });
-    y = doc.lastAutoTable.finalY + 14;              // +6 tra tabella vol e sezione mezzi
+    y = doc.lastAutoTable.finalY + 14;
 
     // ── Mezzi ─────────────────────────────────────────────────
-    const mezSez = _mezziPerPdf.filter(m => (m['SEZIONE']||'').trim().toLowerCase() === sezLow);
+    const mezSez = mezzi.filter(m => (m['SEZIONE']||'').trim().toLowerCase() === sezLow);
 
     doc.setFontSize(12); doc.setFont(undefined, 'bold');
     doc.setTextColor(...verde);
     doc.text(`MEZZI (${mezSez.length})`, 14, y);
     doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
-    y += 8;                                          // +4 tra titolo mezzi e tabella
+    y += 8;
 
-    const mezRows = mezSez.map(m => [
-      m['TARGA']||'—', m['DESCRIZIONE']||'—', m['TIPOLOGIA']||'—',
-      m['UTILIZZO']||'—', m['VARCO'] != null ? `${m['VARCO']}` : '—', m['DISLOCAZIONE']||'—',
-    ]);
+    const mezRows = mezSez.map(m => {
+      const varcoRigaMezzo = m['VARCO'] != null ? varchi.find(vx => vx['VARCO'] == m['VARCO']) : null;
+      const indirMezzo = varcoRigaMezzo ? (varcoRigaMezzo['INDIRIZZO'] || '—') : '—';
+      return [
+        m['TARGA']||'—', m['DESCRIZIONE']||'—', m['TIPOLOGIA']||'—',
+        m['UTILIZZO']||'—',
+        m['VARCO'] != null ? `${m['VARCO']}` : '—',
+        indirMezzo,
+      ];
+    });
 
     doc.autoTable({
       startY: y,
-      head: [['Targa','Descrizione','Tipologia','Utilizzo','Varco','Dislocazione']],
+      head: [['Targa','Descrizione','Tipologia','Utilizzo','Varco','Indirizzo Varco']],
       body: mezRows.length ? mezRows : [['Nessun mezzo','','','','','']],
       styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
       headStyles: { fillColor: verde, fontStyle: 'bold', fontSize: 8.5 },
-      columnStyles: { 0:{cellWidth:24}, 1:{cellWidth:46}, 2:{cellWidth:26}, 3:{cellWidth:28}, 4:{cellWidth:16}, 5:{cellWidth:26} },
+      columnStyles: { 0:{cellWidth:22}, 1:{cellWidth:40}, 2:{cellWidth:24}, 3:{cellWidth:26}, 4:{cellWidth:14}, 5:{cellWidth:42} },
       margin: { left: 14, right: 14 },
     });
-    y = doc.lastAutoTable.finalY + 14;              // +6 tra tabella mezzi e riepilogo
+    y = doc.lastAutoTable.finalY + 14;
 
     // ── Riepilogo ─────────────────────────────────────────────
     const totVarchi = mezSez.filter(m => m['UTILIZZO'] === 'VARCHI').length;
