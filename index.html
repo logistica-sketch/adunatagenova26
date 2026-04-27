@@ -1980,8 +1980,16 @@ function scaricaPdfMiaSezione() {
   _generaPdf([sez]);
 }
 
-function _generaPdf(sezioni) {
+async function _generaPdf(sezioni) {
   if (typeof window.jspdf === 'undefined') { alert('Libreria PDF non caricata. Verifica la connessione internet.'); return; }
+  setLoading(true);
+  try {
+    // Ricarica mezzi freschi dal DB per avere VARCO sempre aggiornato
+    const { data: mezziAggiornati } = await sb.from('MEZZI').select('*');
+    if (mezziAggiornati) _mezziPerPdf = mezziAggiornati;
+  } catch(e) { console.warn('PDF: impossibile aggiornare mezzi:', e); }
+  finally { setLoading(false); }
+
   const { jsPDF } = window.jspdf;
   const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
