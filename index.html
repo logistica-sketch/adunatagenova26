@@ -2194,13 +2194,18 @@ function renderTurnoAttivo() {
   const miaSez = isSez ? (CU['SEZIONE'] || '') : null;
   const volTurno = _volontari.filter(v => v['TURNO'] === turno);
 
+  // Confronto sezione fuzzy: case-insensitive + startsWith bidirezionale.
+  // "CASALE" matcha "CASALE MONFERRATO" e viceversa.
+  function sezMatch(a, b) {
+    if (!a || !b) return false;
+    const A = a.trim().toUpperCase(), B = b.trim().toUpperCase();
+    return A === B || A.startsWith(B) || B.startsWith(A);
+  }
+
   // Logica posizionale volontari: primi 2 per varco = principali, dal 3° = extra
   function splitVarco(varcoNum) {
     let tutti = volTurno.filter(x => x['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
-    if (isSez && miaSez) {
-      const ml = miaSez.trim().toUpperCase();
-      tutti = tutti.filter(x => (x['SEZIONE'] || '').trim().toUpperCase() === ml);
-    }
+    if (isSez && miaSez) tutti = tutti.filter(x => sezMatch(x['SEZIONE'], miaSez));
     return { principali: tutti.slice(0, 2), extra: tutti.slice(2) };
   }
 
@@ -2209,28 +2214,26 @@ function renderTurnoAttivo() {
   // - il suo VARCO non corrisponde al varco della sua SEZIONE in tabella VARCHI
   function volMostraExtra(vol) {
     if (vol['JOLLY']) return true;
-    const varcoSez = _varchi.find(vx =>
-      (vx['SEZIONI'] || '').toLowerCase() === (vol['SEZIONE'] || '').toLowerCase()
-    );
+    const varcoSez = _varchi.find(vx => sezMatch(vx['SEZIONI'], vol['SEZIONE']));
     if (!varcoSez) return true;
     return vol['VARCO'] != varcoSez['VARCO'];
   }
 
   // Mezzi VARCHI per varco.
   // Priorità: se VARCO è impostato sul mezzo, usalo (evita duplicati dopo drag).
-  // Fallback su SEZIONE solo se VARCO è null.
+  // Fallback su SEZIONE (fuzzy) solo se VARCO è null.
+  // Per utenti sezionali: mostra solo i mezzi della propria sezione (fuzzy match).
   function getMezziVarco(varcoNum) {
-    // Mostra tutti i mezzi VARCHI assegnati a questo varco (per VARCO esplicito)
-    // oppure quelli della sezione di questo varco se VARCO=null.
-    // Non filtriamo per SEZIONE dell'utente: il varco è già il filtro corretto
-    // e i nomi di sezione possono non corrispondere esattamente al CU['SEZIONE'].
     const sezVarco = ((_varchi.find(vx => vx['VARCO'] == varcoNum) || {})['SEZIONI'] || '').trim().toUpperCase();
-    return _mezzi.filter(m => {
+    let tutti = _mezzi.filter(m => {
       if (m['UTILIZZO'] !== 'VARCHI') return false;
       if (m['VARCO'] != null) return m['VARCO'] == varcoNum;
       const sezM = (m['SEZIONE'] || '').trim().toUpperCase();
-      return sezVarco && sezM === sezVarco;
+      return sezVarco && (sezM === sezVarco || sezM.startsWith(sezVarco) || sezVarco.startsWith(sezM));
     });
+    // Per utenti sezionali mostra solo i mezzi della propria sezione
+    if (isSez && miaSez) tutti = tutti.filter(m => sezMatch(m['SEZIONE'], miaSez));
+    return tutti;
   }
 
   let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totMezziGriglia=0;

@@ -1,5 +1,5 @@
 // ── Aggiorna questo valore ad ogni deploy ─────────────────────
-const CACHE_NAME = 'adunata-20260428-1000';
+const CACHE_NAME = 'adunata-20260428-1100';
 
 // Host esterni da non intercettare mai
 const BYPASS = [
