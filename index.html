@@ -2197,7 +2197,10 @@ function renderTurnoAttivo() {
   // Logica posizionale volontari: primi 2 per varco = principali, dal 3° = extra
   function splitVarco(varcoNum) {
     let tutti = volTurno.filter(x => x['VARCO'] == varcoNum).sort((a,b) => a.id - b.id);
-    if (isSez) tutti = tutti.filter(x => x['SEZIONE'] === miaSez);
+    if (isSez && miaSez) {
+      const ml = miaSez.trim().toUpperCase();
+      tutti = tutti.filter(x => (x['SEZIONE'] || '').trim().toUpperCase() === ml);
+    }
     return { principali: tutti.slice(0, 2), extra: tutti.slice(2) };
   }
 
@@ -2220,11 +2223,15 @@ function renderTurnoAttivo() {
     const sezVarco = ((_varchi.find(vx => vx['VARCO'] == varcoNum) || {})['SEZIONI'] || '').trim().toUpperCase();
     let tutti = _mezzi.filter(m => {
       if (m['UTILIZZO'] !== 'VARCHI') return false;
-      if (m['VARCO'] != null) return m['VARCO'] == varcoNum;          // VARCO esplicito → usa solo quello
-      const sezM = (m['SEZIONE'] || '').trim().toUpperCase();         // VARCO=null → fallback SEZIONE
+      if (m['VARCO'] != null) return m['VARCO'] == varcoNum;
+      const sezM = (m['SEZIONE'] || '').trim().toUpperCase();
       return sezVarco && sezM === sezVarco;
     });
-    if (isSez) tutti = tutti.filter(m => (m['SEZIONE'] || '') === miaSez);
+    // Filtro sezionale case-insensitive con trim
+    if (isSez && miaSez) {
+      const ml = miaSez.trim().toUpperCase();
+      tutti = tutti.filter(m => (m['SEZIONE'] || '').trim().toUpperCase() === ml);
+    }
     return tutti;
   }
 
