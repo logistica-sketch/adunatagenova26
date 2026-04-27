@@ -1642,7 +1642,7 @@ function buildNavbar() {
   navbar.innerHTML = tabs.map(t =>
     `<button class="nav-tab" data-tab="${t.id}" onclick="showTab('${t.id}')">${t.label}</button>`
   ).join('') +
-  `<a class="nav-tab" href="https://www.google.com/maps/d/u/2/viewer?mid=1c3OipIcYOssM6SuIB_CPsdXv1UbbD_Q&ll=44.41981083520628%2C8.806570201136402&z=13" target="_blank" rel="noopener noreferrer">🗺️ Mappa</a>`;
+  (isFull ? `<a class="nav-tab" href="https://www.google.com/maps/d/u/2/viewer?mid=1c3OipIcYOssM6SuIB_CPsdXv1UbbD_Q&ll=44.41981083520628%2C8.806570201136402&z=13" target="_blank" rel="noopener noreferrer">🗺️ Mappa</a>` : '');
 }
 
 // ── LOADING ───────────────────────────────────────────────────
@@ -2220,19 +2220,17 @@ function renderTurnoAttivo() {
   // Priorità: se VARCO è impostato sul mezzo, usalo (evita duplicati dopo drag).
   // Fallback su SEZIONE solo se VARCO è null.
   function getMezziVarco(varcoNum) {
+    // Mostra tutti i mezzi VARCHI assegnati a questo varco (per VARCO esplicito)
+    // oppure quelli della sezione di questo varco se VARCO=null.
+    // Non filtriamo per SEZIONE dell'utente: il varco è già il filtro corretto
+    // e i nomi di sezione possono non corrispondere esattamente al CU['SEZIONE'].
     const sezVarco = ((_varchi.find(vx => vx['VARCO'] == varcoNum) || {})['SEZIONI'] || '').trim().toUpperCase();
-    let tutti = _mezzi.filter(m => {
+    return _mezzi.filter(m => {
       if (m['UTILIZZO'] !== 'VARCHI') return false;
       if (m['VARCO'] != null) return m['VARCO'] == varcoNum;
       const sezM = (m['SEZIONE'] || '').trim().toUpperCase();
       return sezVarco && sezM === sezVarco;
     });
-    // Filtro sezionale case-insensitive con trim
-    if (isSez && miaSez) {
-      const ml = miaSez.trim().toUpperCase();
-      tutti = tutti.filter(m => (m['SEZIONE'] || '').trim().toUpperCase() === ml);
-    }
-    return tutti;
   }
 
   let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totMezziGriglia=0;
