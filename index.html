@@ -2176,13 +2176,16 @@ function renderTurnoAttivo() {
     return vol['VARCO'] != varcoSez['VARCO'];
   }
 
-  // Mezzi VARCHI per varco: lookup diretto da _mezzi per SEZIONE, indipendente dal turno
+  // Mezzi VARCHI per varco.
+  // Priorità: se VARCO è impostato sul mezzo, usalo (evita duplicati dopo drag).
+  // Fallback su SEZIONE solo se VARCO è null.
   function getMezziVarco(varcoNum) {
     const sezVarco = ((_varchi.find(vx => vx['VARCO'] == varcoNum) || {})['SEZIONI'] || '').trim().toUpperCase();
     let tutti = _mezzi.filter(m => {
       if (m['UTILIZZO'] !== 'VARCHI') return false;
-      const sezM = (m['SEZIONE'] || '').trim().toUpperCase();
-      return (sezVarco && sezM === sezVarco) || m['VARCO'] == varcoNum;
+      if (m['VARCO'] != null) return m['VARCO'] == varcoNum;          // VARCO esplicito → usa solo quello
+      const sezM = (m['SEZIONE'] || '').trim().toUpperCase();         // VARCO=null → fallback SEZIONE
+      return sezVarco && sezM === sezVarco;
     });
     if (isSez) tutti = tutti.filter(m => (m['SEZIONE'] || '') === miaSez);
     return tutti;
