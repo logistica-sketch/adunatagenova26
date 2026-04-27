@@ -2095,7 +2095,6 @@ async function deleteMezzoFromSez(id, targa) {
   if (!confirm(`Eliminare il mezzo "${targa}"?`)) return;
   setLoading(true);
   try {
-    await sb.from('MEZZI_TURNI').delete().eq('MEZZO_ID', id);
     await sb.from('MEZZI').delete().eq('id', id);
     await renderSezioni();
   } catch(e) { alert('Errore: ' + e.message); }
@@ -2112,16 +2111,14 @@ let _mezziTurni = [];
 async function renderGriglia() {
   setLoading(true);
   try {
-    const [{ data: turni }, { data: varchi }, { data: volontari }, { data: mezziTurni }, { data: mezzi }] = await Promise.all([
+    const [{ data: turni }, { data: varchi }, { data: volontari }, { data: mezzi }] = await Promise.all([
       sb.from('TURNI').select('*').order('Etichetta'),
       sb.from('VARCHI').select('*').order('VARCO'),
       sb.from('VOLONTARI').select('*'),
-      sb.from('MEZZI_TURNI').select('*, MEZZI(*)'),
       sb.from('MEZZI').select('*'),
     ]);
     _turni = turni || []; _varchi = varchi || [];
     _volontari = volontari || []; _mezzi = mezzi || [];
-    _mezziTurni = mezziTurni || [];
 
     // Aggiorna intestazione in base al tipo di accesso
     const isSezGriglia = CU && (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO');
@@ -2158,8 +2155,7 @@ function renderTurnoAttivo() {
   const turno = _turnoAttivo;
   const isSez = CU && (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO');
   const miaSez = isSez ? (CU['SEZIONE'] || '') : null;
-  const volTurno   = _volontari.filter(v => v['TURNO'] === turno);
-  const mezziTurno = _mezziTurni.filter(mt => mt['TURNO'] === turno);
+  const volTurno = _volontari.filter(v => v['TURNO'] === turno);
 
   // Logica posizionale volontari: primi 2 per varco = principali, dal 3° = extra
   function splitVarco(varcoNum) {
@@ -2268,10 +2264,18 @@ function renderTurnoAttivo() {
       : (isSez && principali.length < 2 ? `<span class="slot-vuoto-readonly">slot vuoto</span>` : '');
 
     function buildMezzoChip(m) {
-      return `<div class="mezzo-chip${isSez ? ' readonly' : ''}">
+      if (isSez) {
+        return `<div class="mezzo-chip readonly">
+          <div class="mc-targa">${m['TARGA']}${m['DESCRIZIONE'] ? ' – ' + m['DESCRIZIONE'] : ''}</div>
+          <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
+          <div class="mc-sez">Sez: ${m['SEZIONE'] || '—'}</div>
+        </div>`;
+      }
+      return `<div class="mezzo-chip" draggable="true" ondragstart="dragStart(event,'mezzo',${m.id})">
         <div class="mc-targa">${m['TARGA']}${m['DESCRIZIONE'] ? ' – ' + m['DESCRIZIONE'] : ''}</div>
         <div class="mc-tipo">${m['TIPOLOGIA']||''}</div>
         <div class="mc-sez">Sez: ${m['SEZIONE'] || '—'}</div>
+        <button class="mc-remove" onclick="rimuoviMezzoVarco(${m.id});event.stopPropagation()" title="Rimuovi dal varco">✕</button>
       </div>`;
     }
     const mezziVarco = getMezziVarco(v['VARCO']);
@@ -2290,7 +2294,7 @@ function renderTurnoAttivo() {
           ${chipsP}${chipsE}${slotVuoto}
         </div>
       </td>
-      <td class="td-mezzo" style="vertical-align:top">${mezzoHtml}</td>
+      <td class="td-mezzo" style="vertical-align:top" ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)">${mezzoHtml}</td>
       <td class="td-stato">${statoHtml}</td>
     </tr>`;
   }).join('');
@@ -2383,17 +2387,26 @@ async function dropOnVarco(e, varco, turno) {
         JOLLY: saràJolly
       }).eq('id', _dragData.id);
     } else if (_dragData.tipo === 'mezzo') {
-      const mt = _mezziTurni.find(m => m.id === _dragData.id);
-      if (mt) {
-        await sb.from('MEZZI').update({ VARCO: varco }).eq('id', mt['MEZZO_ID']);
-        if (mt['TURNO'] !== turno) {
-          await sb.from('MEZZI_TURNI').update({ TURNO: turno }).eq('id', mt.id);
+      const m = _mezzi.find(x => x.id === _dragData.id);
+      if (m) {
+        const oldVarco = m['VARCO'];
+        m['VARCO'] = varco;                          // aggiorna locale ottimisticamente
+        try {
+          const { error } = await sb.from('MEZZI').update({ VARCO: varco }).eq('id', m.id);
+          if (error) throw error;
+        } catch(err) {
+          m['VARCO'] = oldVarco;                     // rollback locale
+          _dragData = null;
+          setLoading(false);
+          renderTurnoAttivo();
+          alert('Errore spostamento mezzo: ' + err.message);
+          return;
         }
       }
     }
     _dragData = null;
     showSavedToast();
-    await renderGriglia();
+    renderTurnoAttivo();                             // aggiorna solo la vista, no re-fetch
   } catch(err) { console.error(err); alert('Errore: ' + err.message); }
   finally { setLoading(false); }
 }
@@ -2412,13 +2425,25 @@ async function dropOnJolly(e) {
   e.preventDefault();
   const box = document.getElementById('pool-jolly-box');
   if (box) box.classList.remove('jolly-drop-target');
-  if (!_dragData || _dragData.tipo !== 'vol') return;
+  if (!_dragData) return;
   setLoading(true);
   try {
-    await sb.from('VOLONTARI').update({ JOLLY: true, VARCO: null }).eq('id', _dragData.id);
+    if (_dragData.tipo === 'vol') {
+      await sb.from('VOLONTARI').update({ JOLLY: true, VARCO: null }).eq('id', _dragData.id);
+      const v = _volontari.find(x => x.id === _dragData.id);
+      if (v) { v['JOLLY'] = true; v['VARCO'] = null; }
+    } else if (_dragData.tipo === 'mezzo') {
+      const m = _mezzi.find(x => x.id === _dragData.id);
+      if (m) {
+        const oldVarco = m['VARCO'];
+        m['VARCO'] = null;
+        const { error } = await sb.from('MEZZI').update({ VARCO: null }).eq('id', m.id);
+        if (error) { m['VARCO'] = oldVarco; throw error; }
+      }
+    }
     _dragData = null;
     showSavedToast();
-    await renderGriglia();
+    renderTurnoAttivo();
   } catch(err) { console.error(err); alert('Errore: ' + err.message); }
   finally { setLoading(false); }
 }
@@ -2480,40 +2505,22 @@ async function rimuoviVol(id) {
 }
 
 // ── ASSEGNA MEZZO ─────────────────────────────────────────────
-async function openAssegnaMezzo(varco, turno, sezVarco) {
-  _assCtx = { varco, turno };
-  document.getElementById('modal-assegna-mezzo-title').textContent = `Assegna Mezzo – Varco ${varco}`;
-  document.getElementById('assegna-mezzo-info').innerHTML =
-    `<strong>Varco:</strong> ${varco} &nbsp;·&nbsp; <strong>Turno:</strong> ${turno}<br><strong>Sezione:</strong> ${sezVarco || '—'}`;
-  const occupatiIds = _mezziTurni.filter(mt => mt['TURNO'] === turno).map(mt => mt['MEZZO_ID']);
-  const disp = _mezzi.filter(m => !occupatiIds.includes(m.id) && (!m['UTILIZZO'] || m['UTILIZZO'] === 'VARCO'));
-  document.getElementById('assegna-mezzo-sel').innerHTML = disp.length
-    ? disp.map(m => `<option value="${m.id}">${m['TARGA']} · ${m['MARCA'] || ''} ${m['MODELLO'] || ''} · ${m['SEZIONE'] || '—'}</option>`).join('')
-    : '<option value="">— Nessun mezzo disponibile —</option>';
-  openModal('modal-assegna-mezzo');
-}
-
-async function doAssegnaMezzo() {
-  const mezzoId = document.getElementById('assegna-mezzo-sel').value;
-  if (!mezzoId) { showFormAlert('assegna-mezzo-alert', 'Seleziona un mezzo', 'err'); return; }
-  setLoading(true);
+async function rimuoviMezzoVarco(id) {
+  if (!confirm('Rimuovere il mezzo dal varco?')) return;
+  const m = _mezzi.find(x => x.id === id);
+  if (!m) return;
+  const oldVarco = m['VARCO'];
+  m['VARCO'] = null;
+  renderTurnoAttivo();
   try {
-    await sb.from('MEZZI').update({ VARCO: _assCtx.varco }).eq('id', parseInt(mezzoId));
-    await sb.from('MEZZI_TURNI').insert({ MEZZO_ID: parseInt(mezzoId), TURNO: _assCtx.turno });
-    closeModal('modal-assegna-mezzo');
-    await renderGriglia();
-  } catch(e) { showFormAlert('assegna-mezzo-alert', 'Errore: ' + e.message, 'err'); }
-  finally { setLoading(false); }
-}
-
-async function rimuoviMezzo(mezziTurniId) {
-  if (!confirm('Rimuovere il mezzo da questo turno?')) return;
-  setLoading(true);
-  try {
-    await sb.from('MEZZI_TURNI').delete().eq('id', mezziTurniId);
-    await renderGriglia();
-  } catch(e) { alert('Errore: ' + e.message); }
-  finally { setLoading(false); }
+    const { error } = await sb.from('MEZZI').update({ VARCO: null }).eq('id', id);
+    if (error) throw error;
+    showSavedToast('Rimosso ✓');
+  } catch(e) {
+    m['VARCO'] = oldVarco;
+    renderTurnoAttivo();
+    alert('Errore: ' + e.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3324,7 +3331,7 @@ function scaricaExcelTurno() {
   const turno    = _turnoAttivo;
   const turnoObj = _turni.find(t => t['Etichetta'] === turno) || {};
   const volTurno = _volontari.filter(v => v['TURNO'] === turno);
-  const mezziT   = _mezziTurni.filter(mt => mt['TURNO'] === turno);
+  // Mezzi: non più legati al turno, si cercano per VARCO direttamente in _mezzi
 
   // Intestazione riepilogo
   const rows = [];
@@ -3344,7 +3351,7 @@ function scaricaExcelTurno() {
 
     const principali = nelVarco.slice(0, 2);
     const extra      = nelVarco.slice(2);
-    const mezzo      = mezziT.find(mt => mt['MEZZI'] && mt['MEZZI']['VARCO'] == v['VARCO']);
+    const mezzo      = _mezzi.find(m => m['UTILIZZO'] === 'VARCHI' && m['VARCO'] == v['VARCO']);
 
     const nP = principali.length;
     let stato = nP >= 2 ? (extra.length > 0 ? 'SURPLUS' : 'COMPLETO') : nP === 1 ? 'PARZIALE' : 'SCOPERTO';
@@ -3367,8 +3374,8 @@ function scaricaExcelTurno() {
       v2['TELEFONO'] || '—',
       v2['NON_PC'] ? 'NON PC' : (v2['NOME_COGNOME'] ? 'PC' : '—'),
       extraNomi,
-      mezzo ? mezzo['MEZZI']['TARGA'] : '—',
-      mezzo ? (mezzo['MEZZI']['TIPOLOGIA'] || '—') : '—',
+      mezzo ? mezzo['TARGA'] : '—',
+      mezzo ? (mezzo['TIPOLOGIA'] || '—') : '—',
       stato
     ]);
   });
