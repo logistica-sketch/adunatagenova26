@@ -225,6 +225,9 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
 .turno-btn{height:36px;padding:0 16px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);font-family:'Geist',sans-serif;font-size:12px;font-weight:700;color:var(--testo2);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
 .turno-btn:hover{border-color:var(--verde);color:var(--verde);}
 .turno-btn.active{background:var(--verde);border-color:var(--verde);color:#fff;}
+.turno-btn-wrap{display:inline-flex;align-items:center;gap:2px;}
+.turno-pdf-btn{height:28px;padding:0 9px;border:1.5px solid #1a6e2e;border-radius:var(--r);background:#f0f9f1;font-family:'Geist',sans-serif;font-size:10px;font-weight:700;color:#1a6e2e;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.turno-pdf-btn:hover{background:#1a6e2e;color:#fff;}
 
 /* STATS TURNO */
 .turno-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:20px;}
@@ -714,6 +717,9 @@ tbody tr:last-child td{border-bottom:none;} tbody tr:hover td{background:#fafbfc
 .turno-btn{height:36px;padding:0 16px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);font-family:'Geist',sans-serif;font-size:12px;font-weight:700;color:var(--testo2);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
 .turno-btn:hover{border-color:var(--verde);color:var(--verde);}
 .turno-btn.active{background:var(--verde);border-color:var(--verde);color:#fff;}
+.turno-btn-wrap{display:inline-flex;align-items:center;gap:2px;}
+.turno-pdf-btn{height:28px;padding:0 9px;border:1.5px solid #1a6e2e;border-radius:var(--r);background:#f0f9f1;font-family:'Geist',sans-serif;font-size:10px;font-weight:700;color:#1a6e2e;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.turno-pdf-btn:hover{background:#1a6e2e;color:#fff;}
 
 /* STATS TURNO */
 .turno-stats{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:20px;}
@@ -1983,6 +1989,233 @@ function scaricaPdfMiaSezione() {
   _generaPdf([sez]);
 }
 
+async function scaricaPdfTurno(etichetta) {
+  if (typeof window.jspdf === 'undefined') { alert('Libreria PDF non caricata. Verifica la connessione internet.'); return; }
+  const et = etichetta || _turnoAttivo;
+  if (!et) { alert('Nessun turno selezionato.'); return; }
+
+  setLoading(true);
+  let volontari, mezzi, varchi, turni;
+  try {
+    const [r1, r2, r3, r4] = await Promise.all([
+      sb.from('VOLONTARI').select('*'),
+      sb.from('MEZZI').select('*'),
+      sb.from('VARCHI').select('*').order('VARCO'),
+      sb.from('TURNI').select('*').order('Etichetta'),
+    ]);
+    volontari = r1.data || [];
+    mezzi     = r2.data || [];
+    varchi    = r3.data || [];
+    turni     = r4.data || [];
+  } catch(e) {
+    setLoading(false);
+    alert('Errore caricamento dati PDF: ' + e.message);
+    return;
+  }
+  setLoading(false);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  const turnoObj    = turni.find(t => t['Etichetta'] === et) || {};
+  const turnoNome   = (turnoObj['NOME TURNO'] || et).toUpperCase();
+  const turnoGiorno = turnoObj['GIORNO'] || '';
+  const turnoFascia = turnoObj['FASCIA ORARIA'] || '';
+  const subtitleT   = [turnoGiorno, turnoFascia].filter(Boolean).join(' · ');
+
+  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const ora  = new Date().toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+
+  // Layout A4 landscape: 297×210mm
+  const marginL = 10, marginR = 10;
+  const W = 297 - marginL - marginR; // 277mm
+
+  // Column widths
+  const colVarco = 36, colMezzo = 65;
+  const colVol   = W - colVarco - colMezzo; // 176mm
+
+  // Vertical layout
+  const yHeader = 6,  hHeader = 14;
+  const yTurno  = yHeader + hHeader + 1; // 21
+  const hTurno  = 12;
+  const tableStartY = yTurno + hTurno + 4; // 37
+
+  // Build row data (query-fresh)
+  const volTurno = volontari.filter(v => v['TURNO'] === et);
+
+  const rowData = varchi.map(v => {
+    const vn   = v['VARCO'];
+    const sezV = (v['SEZIONI'] || '').trim().toUpperCase();
+    const mezziV = mezzi.filter(m => {
+      if (m['UTILIZZO'] !== 'VARCHI') return false;
+      if (m['VARCO'] != null) return m['VARCO'] == vn;
+      const sezM = (m['SEZIONE'] || '').trim().toUpperCase();
+      return sezV && (sezM === sezV || sezM.startsWith(sezV) || sezV.startsWith(sezM));
+    });
+    const volV = volTurno.filter(x => x['VARCO'] == vn).sort((a, b) => a.id - b.id);
+    return {
+      varcoNum:  vn,
+      indirizzo: v['INDIRIZZO'] || '',
+      vol1:      volV[0] || null,
+      vol2:      volV[1] || null,
+      mezziV,
+    };
+  });
+
+  // Draw table
+  doc.autoTable({
+    startY: tableStartY,
+    head: [[
+      { content: 'VARCO',     styles: { halign: 'center' } },
+      { content: 'VOLONTARI', styles: { halign: 'left'   } },
+      { content: 'MEZZO',     styles: { halign: 'center' } },
+    ]],
+    body: rowData.map(() => ['', '', '']),
+    styles: {
+      cellPadding: 0,
+      overflow:    'hidden',
+      minCellHeight: 26,
+      lineWidth:   0.1,
+      lineColor:   [220, 220, 220],
+    },
+    headStyles: {
+      fillColor:  [26, 61, 28],
+      textColor:  [255, 255, 255],
+      fontStyle:  'bold',
+      fontSize:   8.5,
+      cellPadding: { top:3, bottom:3, left:4, right:4 },
+    },
+    alternateRowStyles: { fillColor: [250, 250, 247] },
+    columnStyles: {
+      0: { cellWidth: colVarco },
+      1: { cellWidth: colVol   },
+      2: { cellWidth: colMezzo },
+    },
+    margin: { left: marginL, right: marginR, top: tableStartY, bottom: 16 },
+
+    didDrawCell: function(data) {
+      if (data.section !== 'body') return;
+      const row = rowData[data.row.index];
+      if (!row) return;
+      const { x, y, width, height } = data.cell;
+
+      // ── VARCO ──────────────────────────────────────────────
+      if (data.column.index === 0) {
+        doc.setFontSize(20); doc.setFont(undefined, 'bold'); doc.setTextColor(26, 61, 28);
+        doc.text(String(row.varcoNum), x + width / 2, y + 10, { align: 'center' });
+        if (row.indirizzo) {
+          doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(120, 120, 120);
+          const lines = doc.splitTextToSize(row.indirizzo, width - 4).slice(0, 2);
+          doc.text(lines, x + width / 2, y + 16, { align: 'center' });
+        }
+
+      // ── VOLONTARI ──────────────────────────────────────────
+      } else if (data.column.index === 1) {
+        const mid  = y + height / 2;
+        const sezW = 52, telW = 36;
+        const nomeW = width - 6 - sezW - telW;
+        const xNome = x + 3;
+        const xSez  = x + 3 + nomeW + 2;
+
+        function drawVol(vol, lineY) {
+          if (vol) {
+            doc.setFontSize(9.5); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 30, 30);
+            doc.text(
+              doc.splitTextToSize((vol['NOME_COGNOME'] || '—').toUpperCase(), nomeW)[0],
+              xNome, lineY
+            );
+            doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(110, 110, 110);
+            doc.text(
+              doc.splitTextToSize(vol['SEZIONE'] || '', sezW - 2)[0],
+              xSez, lineY
+            );
+            doc.setFontSize(8.5); doc.setTextColor(30, 100, 200);
+            doc.text(vol['TELEFONO'] || '', x + width - 3, lineY, { align: 'right' });
+          } else {
+            doc.setFontSize(8); doc.setFont(undefined, 'italic'); doc.setTextColor(160, 160, 160);
+            doc.text('slot vuoto', xNome, lineY);
+          }
+        }
+
+        drawVol(row.vol1, y + height / 4 + 1);
+
+        // Divisore tratteggiato
+        doc.setDrawColor(190, 190, 190);
+        doc.setLineDash([0.8, 0.8], 0);
+        doc.line(x + 2, mid, x + width - 2, mid);
+        doc.setLineDash([], 0);
+        doc.setDrawColor(220, 220, 220);
+
+        drawVol(row.vol2, y + height * 3 / 4 + 1);
+
+      // ── MEZZO ──────────────────────────────────────────────
+      } else if (data.column.index === 2) {
+        const m = row.mezziV[0];
+        if (!m) {
+          doc.setFontSize(14); doc.setFont(undefined, 'normal'); doc.setTextColor(180, 180, 180);
+          doc.text('—', x + width / 2, y + height / 2, { align: 'center', baseline: 'middle' });
+        } else {
+          const bPad = 3;
+          const bX = x + bPad, bY = y + 3;
+          const bW = width - 2 * bPad, bH = height - 6;
+          doc.setFillColor(238, 244, 251);
+          doc.setDrawColor(181, 212, 244);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(bX, bY, bW, bH, 2, 2, 'FD');
+          doc.setLineWidth(0.2);
+          doc.setFont('Courier', 'bold'); doc.setFontSize(9); doc.setTextColor(30, 100, 200);
+          doc.text(m['TARGA'] || '', bX + 3, bY + 6);
+          if (m['DESCRIZIONE']) {
+            doc.setFont(undefined, 'normal'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
+            const dl = doc.splitTextToSize(m['DESCRIZIONE'], bW - 6).slice(0, 2);
+            doc.text(dl, bX + 3, bY + 11.5);
+          }
+        }
+      }
+    },
+  });
+
+  // Intestazione + barra turno + footer su ogni pagina
+  function disegnaTestata() {
+    doc.setFillColor(26, 61, 28);
+    doc.rect(marginL, yHeader, W, hHeader, 'F');
+    doc.setFontSize(10.5); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
+    doc.text('97ª ADUNATA NAZIONALE ALPINI — GENOVA 2026', marginL + 4, yHeader + 5.5);
+    doc.setFontSize(7.5); doc.setFont(undefined, 'normal');
+    doc.text('Protezione Civile ANA · Area Pedonale Alpina · 08–10 Maggio 2026', marginL + 4, yHeader + 11);
+    doc.setTextColor(210, 230, 210);
+    doc.text(`Stampato il: ${oggi} ore ${ora}`, marginL + W - 3, yHeader + 5.5, { align: 'right' });
+    doc.text('Documento riservato', marginL + W - 3, yHeader + 11, { align: 'right' });
+
+    doc.setFillColor(44, 95, 46);
+    doc.rect(marginL, yTurno, W, hTurno, 'F');
+    doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(255, 255, 255);
+    doc.text(turnoNome, marginL + 5, yTurno + 7.5);
+    if (subtitleT) {
+      doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(200, 230, 200);
+      doc.text(subtitleT, marginL + W - 4, yTurno + 7.5, { align: 'right' });
+    }
+  }
+
+  const totalPages = doc.getNumberOfPages();
+  for (let pg = 1; pg <= totalPages; pg++) {
+    doc.setPage(pg);
+    disegnaTestata();
+
+    const yF = 210 - 13;
+    doc.setFillColor(240, 240, 238);
+    doc.rect(marginL, yF, W, 8, 'F');
+    doc.setDrawColor(26, 110, 46); doc.setLineWidth(0.4);
+    doc.line(marginL, yF, marginL + W, yF);
+    doc.setLineWidth(0.2); doc.setDrawColor(220, 220, 220);
+    doc.setFontSize(7); doc.setFont(undefined, 'normal'); doc.setTextColor(120, 120, 120);
+    doc.text('97ª Adunata Nazionale Alpini — Genova 2026 · Protezione Civile ANA', marginL + 3, yF + 5);
+    doc.text(`Pagina ${pg} di ${totalPages}`, marginL + W - 3, yF + 5, { align: 'right' });
+  }
+
+  doc.save(`TURNO_${et.replace(/\s+/g, '_')}_ADUNATA2026.pdf`);
+}
+
 async function _generaPdf(sezioni) {
   if (typeof window.jspdf === 'undefined') { alert('Libreria PDF non caricata. Verifica la connessione internet.'); return; }
 
@@ -2169,11 +2402,14 @@ async function renderGriglia() {
 
     // Selettore turni
     if (!_turnoAttivo && _turni.length) _turnoAttivo = _turni[0]['Etichetta'];
+    const isFull = CU && CU['TIPOLOGIA'] === 'ACCESSO FULL';
     document.getElementById('turno-selector').innerHTML = _turni.map(t =>
-      `<button class="turno-btn${_turnoAttivo === t['Etichetta'] ? ' active' : ''}"
-        onclick="cambioTurno('${t['Etichetta']}')">
-        ${t['NOME TURNO'] || t['Etichetta']}
-      </button>`
+      `<span class="turno-btn-wrap">
+        <button class="turno-btn${_turnoAttivo === t['Etichetta'] ? ' active' : ''}"
+          onclick="cambioTurno('${t['Etichetta']}')">
+          ${t['NOME TURNO'] || t['Etichetta']}
+        </button>${isFull ? `<button class="turno-pdf-btn" onclick="scaricaPdfTurno('${t['Etichetta']}')" title="Scarica PDF turno">⬇ PDF</button>` : ''}
+      </span>`
     ).join('');
 
     renderTurnoAttivo();
