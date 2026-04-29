@@ -2670,6 +2670,8 @@ async function dropOnVarco(e, varco, turno) {
         TURNO: turno,
         JOLLY: saràJolly
       }).eq('id', _dragData.id);
+      const vol = _volontari.find(x => x.id === _dragData.id);
+      if (vol) { vol['VARCO'] = varco; vol['TURNO'] = turno; vol['JOLLY'] = saràJolly; }
     } else if (_dragData.tipo === 'mezzo') {
       const m = _mezzi.find(x => x.id === _dragData.id);
       if (m) {
