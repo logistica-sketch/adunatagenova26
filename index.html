@@ -1801,10 +1801,13 @@ async function renderDashboard() {
     const sp = document.getElementById('dash-search-panel');
     if (sp) sp.style.display = CU?.TIPOLOGIA === 'ACCESSO FULL' ? '' : 'none';
 
-    const totSlot = _varchi.length * 2; // 25 varchi × 2 = 50 slot totali
-
     let tHTML = '';
     _turni.forEach(t => {
+      // Turni notturni (TURNO 1, TURNO 5): 1 slot per varco invece di 2
+      const isNotturno = /[15]$/.test((t['Etichetta'] || '').trim());
+      const slotsPerVarco = isNotturno ? 1 : 2;
+      const totSlot = _varchi.length * slotsPerVarco;
+
       // Logica posizionale: per ogni varco, i primi 2 per id sono principali
       let principali = 0;
       let completi = 0, parziali = 0, scoperti = 0;
@@ -1812,11 +1815,18 @@ async function renderDashboard() {
         const nelVarco = _volontari
           .filter(x => x['TURNO'] === t['Etichetta'] && x['VARCO'] == v['VARCO'])
           .sort((a, b) => a.id - b.id);
-        const nPrinc = Math.min(nelVarco.length, 2);
-        principali += nPrinc;
-        if (nPrinc >= 2) completi++;
-        else if (nPrinc === 1) parziali++;
-        else scoperti++;
+        const hasSec = !!v['SECURITY'];
+        if (isNotturno) {
+          const haCop = nelVarco.length >= 1 || hasSec;
+          if (haCop) { completi++; principali++; }
+          else scoperti++;
+        } else {
+          const nPrinc = Math.min(nelVarco.length, 2);
+          principali += nPrinc + (hasSec ? 1 : 0);
+          if (nPrinc >= 2) completi++;
+          else if (nPrinc === 1) parziali++;
+          else scoperti++;
+        }
       });
       const p = totSlot ? Math.round(principali / totSlot * 100) : 0;
 
