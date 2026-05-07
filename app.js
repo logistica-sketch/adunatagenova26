@@ -1248,8 +1248,8 @@ async function openAssegnaVol(varco, turno, sezVarco) {
   document.getElementById('modal-assegna-title').textContent = `Assegna Volontario – Varco ${varco}`;
   document.getElementById('assegna-info').innerHTML =
     `<strong>Varco:</strong> ${varco} &nbsp;·&nbsp; <strong>Turno:</strong> ${turno}<br><strong>Sezione:</strong> ${sezVarco || '—'}`;
-  // Mostra volontari dello stesso turno che non hanno varco assegnato
-  const disp = _volontari.filter(v => v['TURNO'] === turno && (!v['VARCO'] || v['JOLLY']));
+  // Mostra solo volontari del turno con VARCO=null (stessi della sezione JOLLY)
+  const disp = _volontari.filter(v => v['TURNO'] === turno && !v['VARCO']);
   document.getElementById('assegna-sel').innerHTML = disp.length
     ? disp.map(v => `<option value="${v.id}">${v['NOME_COGNOME']} · ${v['SEZIONE'] || '—'}</option>`).join('')
     : '<option value="">— Nessun volontario disponibile —</option>';
