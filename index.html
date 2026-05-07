@@ -2803,11 +2803,20 @@ async function toggleSecurity(varcoNum) {
   const varco = _varchi.find(v => v['VARCO'] == varcoNum);
   if (!varco) return;
   const newVal = !varco['SECURITY'];
+  // Usa il valore reale dell'oggetto (tipo corretto) invece del parametro HTML
+  const varcoKey = varco['VARCO'];
   setLoading(true);
   try {
-    const { error } = await sb.from('VARCHI').update({ SECURITY: newVal }).eq('VARCO', varcoNum);
+    const { data: aggiornati, error } = await sb.from('VARCHI')
+      .update({ SECURITY: newVal })
+      .eq('VARCO', varcoKey)
+      .select('VARCO, SECURITY');
     if (error) throw error;
-    varco['SECURITY'] = newVal;
+    // Sincronizza _varchi con i dati reali restituiti dal DB
+    (aggiornati || []).forEach(row => {
+      const v = _varchi.find(x => x['VARCO'] == row['VARCO']);
+      if (v) v['SECURITY'] = row['SECURITY'];
+    });
     showSavedToast(newVal ? 'Security aggiunta ✓' : 'Security rimossa ✓');
     renderTurnoAttivo();
   } catch(e) { console.error(e); alert('Errore Security: ' + e.message); }
