@@ -2480,19 +2480,30 @@ function renderTurnoAttivo() {
     return tutti;
   }
 
-  let completi=0, parziali=0, scoperti=0, surplus=0, totPrinc=0, totMezziGriglia=0;
+  // Turni notturni (TURNO 1, TURNO 5): 1 slot per varco invece di 2
+  const isNotturno = /[15]$/.test((turno || '').trim());
+  const slotsPerVarco = isNotturno ? 1 : 2;
+
+  let completi=0, parziali=0, scoperti=0, totPrinc=0, totMezziGriglia=0;
   _varchi.forEach(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
-    if (principali.length >= 2) completi++;
-    else if (principali.length === 1) parziali++;
-    else scoperti++;
-    if (extra.length > 0) surplus++;
-    totPrinc += principali.length;
+    const hasSec = !!v['SECURITY'];
+    if (isNotturno) {
+      const haCop = principali.length >= 1 || hasSec;
+      if (haCop) completi++;
+      else scoperti++;
+      totPrinc += haCop ? 1 : 0;
+    } else {
+      if (principali.length >= 2) completi++;
+      else if (principali.length === 1) parziali++;
+      else scoperti++;
+      totPrinc += principali.length + (hasSec ? 1 : 0);
+    }
     totMezziGriglia += getMezziVarco(v['VARCO']).length;
   });
   // EXTRA = tutti i non-principali: JOLLY=true (surplus in varco) + VARCO=null (pool non assegnati)
   const totExtra = volTurno.filter(v => v['JOLLY'] === true || !v['VARCO']).length;
-  const totSlot = _varchi.length * 2;
+  const totSlot = _varchi.length * slotsPerVarco;
   const pCop = totSlot ? Math.round(totPrinc / totSlot * 100) : 0;
 
   document.getElementById('turno-stats').innerHTML = `
@@ -2510,14 +2521,22 @@ function renderTurnoAttivo() {
     const { principali, extra } = splitVarco(v['VARCO']);
 
     let statoHtml;
-    if (extra.length > 0 && principali.length >= 2)
-      statoHtml = `<span class="stato-surplus">SURPLUS</span>`;
-    else if (principali.length >= 2)
-      statoHtml = `<span class="stato-completo">COMPLETO</span>`;
-    else if (principali.length === 1)
-      statoHtml = `<span class="stato-parziale">PARZIALE</span>`;
-    else
-      statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
+    if (isNotturno) {
+      const haCop = principali.length >= 1 || !!v['SECURITY'];
+      const haSurp = principali.length >= 2 || (principali.length >= 1 && extra.length > 0);
+      if (haSurp) statoHtml = `<span class="stato-surplus">SURPLUS</span>`;
+      else if (haCop) statoHtml = `<span class="stato-completo">COMPLETO</span>`;
+      else statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
+    } else {
+      if (extra.length > 0 && principali.length >= 2)
+        statoHtml = `<span class="stato-surplus">SURPLUS</span>`;
+      else if (principali.length >= 2)
+        statoHtml = `<span class="stato-completo">COMPLETO</span>`;
+      else if (principali.length === 1)
+        statoHtml = `<span class="stato-parziale">PARZIALE</span>`;
+      else
+        statoHtml = `<span class="stato-scoperto">SCOPERTO</span>`;
+    }
 
     const chipsP = principali.map(vol => {
       const isExtra = volMostraExtra(vol);
@@ -2547,13 +2566,14 @@ function renderTurnoAttivo() {
       </div>`;
     }).join('');
 
-    const slotVuoto = (!isSez && principali.length < 2)
+    const maxPrinc = isNotturno ? 1 : 2;
+    const slotVuoto = (!isSez && principali.length < maxPrinc)
       ? `<div class="slot-drop-zone"
            ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"
            onclick="openAssegnaVol(${v['VARCO']},'${turno}','${(v['SEZIONI']||'').replace(/'/g,"\\'")}')">
            + Trascina volontario qui
          </div>`
-      : (isSez && principali.length < 2 ? `<span class="slot-vuoto-readonly">slot vuoto</span>` : '');
+      : (isSez && principali.length < maxPrinc ? `<span class="slot-vuoto-readonly">slot vuoto</span>` : '');
 
     function buildMezzoChip(m) {
       if (isSez) {
@@ -2678,9 +2698,9 @@ async function dropOnVarco(e, varco, turno) {
       const giàPresenti = _volontari.filter(v =>
         v['TURNO'] === turno && v['VARCO'] == varco && v.id !== _dragData.id
       ).length;
-      // Se ci sono già 2 o più → il volontario spostato sarà EXTRA (JOLLY=true)
-      // Se ce ne sono meno di 2 → sarà principale (JOLLY=false)
-      const saràJolly = giàPresenti >= 2;
+      // Turni notturni (1, 5): 1 slot per varco; tutti gli altri: 2 slot
+      const maxSlotVarco = /[15]$/.test((turno || '').trim()) ? 1 : 2;
+      const saràJolly = giàPresenti >= maxSlotVarco;
       await sb.from('VOLONTARI').update({
         VARCO: varco,
         TURNO: turno,
