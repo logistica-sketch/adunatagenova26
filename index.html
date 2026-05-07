@@ -1027,6 +1027,14 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
 .slot-vuoto-readonly { font-size:11px;color:var(--testo3);font-style:italic;padding:6px 8px;display:inline-block; }
 .nessun-mezzo-readonly { font-size:11px;color:var(--testo3);font-style:italic; }
 
+/* ── SECURITY CHIP ── */
+.security-chip{display:inline-flex;flex-direction:column;background:#1a2236;border:1px solid #2d3f5e;border-radius:6px;padding:6px 10px;margin:3px;min-width:130px;position:relative;}
+.security-chip-name{font-size:11px;font-weight:800;color:#e0e8ff;letter-spacing:0.4px;text-transform:uppercase;}
+.security-chip-sub{font-size:9px;color:#8ba0c8;margin-top:2px;letter-spacing:0.2px;text-transform:uppercase;}
+.security-toggle-btn{display:inline-flex;align-items:center;gap:4px;background:transparent;color:#5a7aaa;border:1px dashed #3a5070;border-radius:5px;padding:4px 9px;font-size:10px;font-weight:700;cursor:pointer;margin:3px;transition:background 0.15s,color 0.15s;font-family:inherit;}
+.security-toggle-btn:hover{background:#1a2236;color:#a0b8dc;border-color:#4d6fa0;}
+.security-toggle-btn.active{background:#1a2236;border-style:solid;border-color:#4d6fa0;color:#a0b8dc;}
+
 /* SW UPDATE BANNER */
 #sw-update-banner{
   display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
@@ -2570,12 +2578,20 @@ function renderTurnoAttivo() {
     const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
     const dropAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
 
+    const isFull2 = CU && CU['TIPOLOGIA'] === 'ACCESSO FULL';
+    const securityBadge = v['SECURITY']
+      ? `<div class="security-chip"><div class="security-chip-name">Security</div><div class="security-chip-sub">Cortesy Solution SRL</div></div>`
+      : '';
+    const securityBtn = isFull2
+      ? `<button class="security-toggle-btn${v['SECURITY'] ? ' active' : ''}" onclick="toggleSecurity(${v['VARCO']})" title="${v['SECURITY'] ? 'Rimuovi Security' : 'Aggiungi Security'}">${v['SECURITY'] ? '✕ Security' : '+ Security'}</button>`
+      : '';
+
     return `<tr${isMiaRiga ? ' class="mia-sezione-row"' : ''}>
       <td class="td-varco">${v['VARCO']}</td>
       <td class="td-sezione">${v['SEZIONI'] || '—'}</td>
       <td class="td-volontari" ${dropAttrs}>
         <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start">
-          ${chipsP}${chipsE}${slotVuoto}
+          ${chipsP}${chipsE}${slotVuoto}${securityBadge}${securityBtn}
         </div>
       </td>
       <td class="td-mezzo" style="vertical-align:top" ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)">${mezzoHtml}</td>
@@ -2746,6 +2762,22 @@ function showSavedToast(msg) {
   toast.style.opacity = '1';
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+}
+
+// ── TOGGLE SECURITY VARCO ─────────────────────────────────────
+async function toggleSecurity(varcoNum) {
+  const varco = _varchi.find(v => v['VARCO'] == varcoNum);
+  if (!varco) return;
+  const newVal = !varco['SECURITY'];
+  setLoading(true);
+  try {
+    const { error } = await sb.from('VARCHI').update({ SECURITY: newVal }).eq('VARCO', varcoNum);
+    if (error) throw error;
+    varco['SECURITY'] = newVal;
+    showSavedToast(newVal ? 'Security aggiunta ✓' : 'Security rimossa ✓');
+    renderTurnoAttivo();
+  } catch(e) { console.error(e); alert('Errore aggiornamento Security: ' + e.message); }
+  finally { setLoading(false); }
 }
 
 // ── ASSEGNA VOLONTARIO ────────────────────────────────────────
