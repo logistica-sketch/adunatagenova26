@@ -321,6 +321,25 @@ async function renderSezioni() {
       return;
     }
 
+    // Helpers per ricostruire turno (giorno/sigla/orario) — stesso schema del PDF
+    const turnoNum = (et) => { const m = (et||'').match(/(\d+)/); return m ? parseInt(m[1],10) : 9999; };
+    const turnoDesc = (turnoObj, etichetta) => {
+      const num = turnoNum(etichetta);
+      const nome = (turnoObj && turnoObj['NOME TURNO'] || '').trim();
+      let day = '';
+      if (/Venerd/i.test(nome)) day = 'Ven';
+      else if (/Sabato/i.test(nome)) day = 'Sab';
+      else if (/Domenica/i.test(nome)) day = 'Dom';
+      else if (/Luned/i.test(nome)) day = 'Lun';
+      else if (/Marted/i.test(nome)) day = 'Mar';
+      else if (/Mercoled/i.test(nome)) day = 'Mer';
+      else if (/Gioved/i.test(nome)) day = 'Gio';
+      let orario = '';
+      const m = nome.match(/(\d{1,2}[:\.]\d{2})\s*-\s*(\d{1,2}[:\.]\d{2})/);
+      if (m) orario = `${m[1].replace('.', ':')}-${m[2].replace('.', ':')}`;
+      return { day, short: `T${num}`, orario };
+    };
+
     container.innerHTML = sezioni.map(sez => {
       const volSez  = (volontari||[]).filter(v => v['SEZIONE'] === sez);
       const mezSez  = (mezzi||[]).filter(m => m['SEZIONE'] === sez);
@@ -330,23 +349,82 @@ async function renderSezioni() {
       const isRO = CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO';
       const sezId = sez.replace(/[^a-zA-Z0-9]/g,'_');
 
-      // Lista volontari
-      const volHTML = totVol ? volSez.map(v => {
-        const turnoLabel = v['TURNO'] ? _turni.find(t=>t['Etichetta']===v['TURNO']) : null;
-        const turnoStr = turnoLabel ? (turnoLabel['NOME TURNO'] || v['TURNO']) : (v['TURNO']||'—');
-        return `<div class="vol-list-item">
-          <div>
-            <div class="vli-nome">${v['NOME_COGNOME']}${v['NON_PC']?' &nbsp;<span class="badge badge-orange" title="Non è di Protezione Civile">NON PC</span>':''}</div>
-            <div class="vli-meta">Turni: ${turnoStr}${v['JOLLY']?' &nbsp;<span class="badge badge-orange">EXTRA</span>':''}</div>
-            <div class="vli-tel">CF: <span style="font-family:'Geist Mono',monospace;letter-spacing:0.5px">${v['CODICE_FISCALE']||'—'}</span></div>
-            <div class="vli-tel">Telefono: ${v['TELEFONO'] ? `<a href="tel:${v['TELEFONO'].replace(/\s/g,'')}" style="color:inherit;text-decoration:none">${v['TELEFONO']}</a>` : '—'}</div>
-          </div>
-          ${isRO ? '' : `<div class="vli-actions">
-            <button class="btn btn-ghost btn-sm" onclick="openEditVolontario(${v.id})">✏️ Modifica</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteVolontario(${v.id})">✕</button>
-          </div>`}
-        </div>`;
-      }).join('') : '<div style="padding:20px;color:var(--testo3);font-size:13px">Nessun volontario registrato.</div>';
+      // Raggruppa volontari per persona (NOME_COGNOME + TELEFONO)
+      const groupsMap = new Map();
+      volSez.forEach(v => {
+        const key = `${(v['NOME_COGNOME']||'').trim().toUpperCase()}|${(v['TELEFONO']||'').trim()}`;
+        if (!groupsMap.has(key)) {
+          groupsMap.set(key, {
+            nome: v['NOME_COGNOME']||'—',
+            tel: v['TELEFONO']||'',
+            cf: v['CODICE_FISCALE'] || '',
+            nonPc: !!v['NON_PC'],
+            entries: [],
+          });
+        }
+        const turnoObj  = (turni||[]).find(t => t['Etichetta'] === v['TURNO']);
+        const varcoRiga = (varchi||[]).find(vx => vx['VARCO'] == v['VARCO']);
+        groupsMap.get(key).entries.push({
+          id: v.id,
+          turnoEtichetta: v['TURNO'],
+          turnoObj,
+          varco: v['VARCO'],
+          indirizzo: varcoRiga ? (varcoRiga['INDIRIZZO'] || '') : '',
+          jolly: !!v['JOLLY'],
+        });
+      });
+      const groupList = [...groupsMap.values()].sort((a,b) =>
+        a.nome.localeCompare(b.nome, 'it', { sensitivity:'base' })
+      );
+      groupList.forEach(g => g.entries.sort((a,b) =>
+        turnoNum(a.turnoEtichetta) - turnoNum(b.turnoEtichetta)
+      ));
+
+      // Render tabella raggruppata
+      let volHTML;
+      if (!groupList.length) {
+        volHTML = '<div class="vps-empty">Nessun volontario registrato.</div>';
+      } else {
+        const rows = groupList.map(g => {
+          const n = g.entries.length;
+          return g.entries.map((e, i) => {
+            const desc = turnoDesc(e.turnoObj, e.turnoEtichetta);
+            const isVen = desc.day === 'Ven';
+            const isSab = desc.day === 'Sab';
+            const badgeCls = isVen ? 'vps-badge vps-badge-ven' : isSab ? 'vps-badge vps-badge-sab' : 'vps-badge vps-badge-def';
+            const badgeText = (desc.day ? `${desc.day} ` : '') + desc.short;
+            const orarioTxt = desc.orario || '';
+            const varcoLabel = e.varco != null ? `Varco ${e.varco}` : (e.jolly ? 'JOLLY' : '—');
+            const varcoTxt = e.indirizzo ? `${varcoLabel} · ${e.indirizzo}` : varcoLabel;
+            const jollyBadge = e.jolly ? ' <span class="badge badge-orange">EXTRA</span>' : '';
+
+            let volCell = '';
+            if (i === 0) {
+              const nonPcBadge = g.nonPc ? ' <span class="badge badge-orange" title="Non è di Protezione Civile">NON PC</span>' : '';
+              volCell = `<td rowspan="${n}" class="vps-vol">
+                <div class="vps-vol-nome">${g.nome}${nonPcBadge}</div>
+                ${g.tel ? `<div class="vps-vol-tel"><a href="tel:${g.tel.replace(/\s/g,'')}">${g.tel}</a></div>` : ''}
+                ${g.cf ? `<div class="vps-vol-cf">CF: <span style="font-family:'Geist Mono',monospace;letter-spacing:0.5px">${g.cf}</span></div>` : ''}
+              </td>`;
+            }
+
+            const turnoCell = `<td class="vps-turno"><span class="${badgeCls}">${badgeText}</span><span class="vps-orario">${orarioTxt}</span>${jollyBadge}</td>`;
+            const varcoCell = `<td class="vps-varco">${varcoTxt}</td>`;
+            const actCell = isRO ? '' : `<td class="vps-act">
+              <button class="btn btn-ghost btn-sm" onclick="openEditVolontario(${e.id})">✏️ Modifica</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteVolontario(${e.id})">✕</button>
+            </td>`;
+
+            return `<tr${i === 0 ? ' class="vps-row-first"' : ''}>${volCell}${turnoCell}${varcoCell}${actCell}</tr>`;
+          }).join('');
+        }).join('');
+
+        const headAct = isRO ? '' : '<th>Azioni</th>';
+        volHTML = `<table class="vps-table">
+          <thead><tr><th>Volontario</th><th>Turni</th><th>Varco assegnato</th>${headAct}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      }
 
       // Lista mezzi
       const mezHTML = totMez ? mezSez.map(m => {

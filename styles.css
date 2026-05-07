@@ -1028,3 +1028,41 @@ tr.mia-sezione-row > td { background:rgba(26,110,46,0.04); }
 }
 #sw-update-btn:hover{background:#155925;}
 
+/* ── Tabella volontari per sezione (raggruppati per persona) ───── */
+.vps-table{width:100%;border-collapse:collapse;font-size:13px;}
+.vps-table thead th{
+  text-align:left;font-size:11px;font-weight:700;letter-spacing:0.4px;
+  color:var(--testo3);text-transform:uppercase;
+  padding:10px 14px;background:#f7f7f4;border-bottom:1px solid var(--border);
+}
+.vps-table tbody td{padding:8px 14px;vertical-align:middle;}
+.vps-table tbody tr.vps-row-first td{border-top:1px solid var(--border);}
+.vps-table tbody tr:not(.vps-row-first) td{border-top:1px dashed #ececea;}
+.vps-table tbody tr:last-child td{border-bottom:1px solid var(--border);}
+.vps-vol{vertical-align:top;padding-top:12px !important;}
+.vps-vol-nome{font-size:14px;font-weight:700;color:var(--testo);}
+.vps-vol-tel{font-size:13px;margin-top:3px;}
+.vps-vol-tel a{color:#1565C0;text-decoration:none;font-weight:500;}
+.vps-vol-cf{font-size:11px;color:var(--testo3);margin-top:3px;}
+.vps-badge{
+  display:inline-block;padding:3px 9px;border-radius:5px;
+  font-size:11px;font-weight:700;letter-spacing:0.3px;margin-right:9px;
+  vertical-align:middle;
+}
+.vps-badge-ven{background:#EAF3DE;color:#27500A;}
+.vps-badge-sab{background:#E6F1FB;color:#0C447C;}
+.vps-badge-def{background:#eee;color:#555;}
+.vps-orario{font-size:13px;color:var(--testo2);font-variant-numeric:tabular-nums;}
+.vps-varco{font-size:13px;color:var(--testo);}
+.vps-act{white-space:nowrap;text-align:right;vertical-align:middle;}
+.vps-empty{padding:20px;color:var(--testo3);font-size:13px;}
+
+@media (max-width: 720px){
+  .vps-table thead{display:none;}
+  .vps-table, .vps-table tbody, .vps-table tr, .vps-table td{display:block;width:100%;}
+  .vps-table tbody td{padding:4px 14px;border-top:none !important;}
+  .vps-table tbody tr.vps-row-first{margin-top:14px;border-top:1px solid var(--border);padding-top:8px;}
+  .vps-vol{padding-top:10px !important;}
+  .vps-act{text-align:left;padding-bottom:10px !important;}
+}
+
