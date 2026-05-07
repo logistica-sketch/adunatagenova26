@@ -746,7 +746,17 @@ async function _generaPdf(sezioni) {
     doc.text(`${voloUnici} volontari`, PAGE_W - MARGIN_R, 30.2, { align: 'right' });
   }
 
-  sezioni.forEach((sez, idx) => {
+  // Escludi sezioni senza alcun volontario
+  const sezioniConVol = sezioni.filter(sez => {
+    const sezLow = sez.trim().toLowerCase();
+    return volontari.some(v => (v['SEZIONE']||'').trim().toLowerCase() === sezLow);
+  });
+  if (sezioniConVol.length === 0) {
+    alert('Nessuna sezione con volontari da stampare.');
+    return;
+  }
+
+  sezioniConVol.forEach((sez, idx) => {
     if (idx > 0) doc.addPage();
     const sezLow = sez.trim().toLowerCase();
 
