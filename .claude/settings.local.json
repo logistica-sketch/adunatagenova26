@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git:*)",
+      "Bash(awk NR>=1016 && NR<=1033:*)",
+      "Bash(awk NR>=7 && NR<=9:*)",
+      "Bash(awk NR>=7 && NR<=11:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(rm:*)"
+    ]
+  }
+}
