@@ -673,7 +673,7 @@ async function _generaPdf(sezioni) {
   setLoading(false);
 
   const { jsPDF } = window.jspdf;
-  const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc  = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
 
   // Palette
@@ -688,17 +688,18 @@ async function _generaPdf(sezioni) {
   const COL_TEL          = [21, 101, 192];  // blu telefono
   const COL_ROW_ALT      = [250, 250, 248]; // #fafaf8
 
-  const PAGE_W = 210;
+  // A4 landscape: 297 x 210 mm
+  const PAGE_W = 297;
   const MARGIN_L = 14, MARGIN_R = 14;
-  const W = PAGE_W - MARGIN_L - MARGIN_R; // 182
+  const W = PAGE_W - MARGIN_L - MARGIN_R; // 269
 
-  // Larghezze colonne (volontario ~50mm, turni ~55mm, varchi resto)
-  const COL_VOL_W   = 50;
-  const COL_TURNI_W = 55;
-  const COL_VAR_W   = W - COL_VOL_W - COL_TURNI_W; // 77
+  // Larghezze colonne piu' generose (font piu' grandi, no wrap)
+  const COL_VOL_W   = 72;
+  const COL_TURNI_W = 78;
+  const COL_VAR_W   = W - COL_VOL_W - COL_TURNI_W; // 119
 
-  const ENTRY_LINE_H = 6;   // mm per ogni riga turno/varco
-  const PAD = 2.5;
+  const ENTRY_LINE_H = 7;   // mm per ogni riga turno/varco
+  const PAD = 3;
 
   // Helpers
   const turnoNum = (et) => { const m = (et||'').match(/(\d+)/); return m ? parseInt(m[1],10) : 9999; };
@@ -719,27 +720,30 @@ async function _generaPdf(sezioni) {
     return { day, short: `T${num}`, orario };
   };
 
-  // Header + barra sezione (disegnati per ogni sezione su prima pagina)
+  // Intestazione slim su sfondo bianco + linea verde, poi barra sezione colorata
   function drawTopBands(sez, voloUnici) {
-    // Banda intestazione (full bleed)
-    doc.setFillColor(...COL_HEADER);
-    doc.rect(0, 0, PAGE_W, 22, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(13); doc.setFont(undefined, 'bold');
-    doc.text('97ª ADUNATA NAZIONALE ALPINI — GENOVA 2026', MARGIN_L, 10);
-    doc.setFontSize(9); doc.setFont(undefined, 'normal');
-    doc.text('Report Volontari per Sezione', MARGIN_L, 16);
-    doc.setFontSize(9);
-    doc.text(`Stampato il ${oggi}`, PAGE_W - MARGIN_R, 16, { align: 'right' });
-
-    // Barra sezione
-    doc.setFillColor(...COL_SEZBAR);
-    doc.rect(0, 22, PAGE_W, 12, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(13); doc.setFont(undefined, 'bold');
-    doc.text(`SEZIONE: ${sez}`, MARGIN_L, 30);
+    // Intestazione: solo testo scuro su bianco
+    doc.setTextColor(20, 20, 20);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+    doc.text('97ª ADUNATA NAZIONALE ALPINI — GENOVA 2026', MARGIN_L, 11);
     doc.setFontSize(10); doc.setFont(undefined, 'normal');
-    doc.text(`${voloUnici} volontari`, PAGE_W - MARGIN_R, 30, { align: 'right' });
+    doc.setTextColor(80, 80, 80);
+    doc.text('Report Volontari per Sezione', MARGIN_L, 17);
+    doc.text(`Stampato il ${oggi}`, PAGE_W - MARGIN_R, 17, { align: 'right' });
+
+    // Linea verde sottile sotto l'intestazione
+    doc.setDrawColor(...COL_HEADER);
+    doc.setLineWidth(0.8);
+    doc.line(MARGIN_L, 20.5, PAGE_W - MARGIN_R, 20.5);
+
+    // Barra sezione (colorata)
+    doc.setFillColor(...COL_SEZBAR);
+    doc.rect(0, 23, PAGE_W, 11, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+    doc.text(`SEZIONE: ${sez}`, MARGIN_L, 30.2);
+    doc.setFontSize(11); doc.setFont(undefined, 'normal');
+    doc.text(`${voloUnici} volontari`, PAGE_W - MARGIN_R, 30.2, { align: 'right' });
   }
 
   sezioni.forEach((sez, idx) => {
@@ -776,13 +780,21 @@ async function _generaPdf(sezioni) {
     const startY = 38;
     const body = groupList.map(g => [{ content: '' }, { content: '' }, { content: '' }]);
 
+    // Helper: tronca con ellissi se il testo eccede la larghezza disponibile
+    const fitWithEllipsis = (txt, maxW) => {
+      if (doc.getTextWidth(txt) <= maxW) return txt;
+      let s = txt;
+      while (s.length > 2 && doc.getTextWidth(s + '…') > maxW) s = s.slice(0, -1);
+      return s.replace(/\s+$/, '') + '…';
+    };
+
     doc.autoTable({
       startY,
       head: [['VOLONTARIO', 'TURNI', 'VARCO ASSEGNATO']],
       body: body.length ? body : [[{ content: 'Nessun volontario in questa sezione', colSpan: 3, styles: { halign: 'center', textColor: [120,120,120] } }]],
       margin: { left: MARGIN_L, right: MARGIN_R },
-      styles: { fontSize: 9, cellPadding: PAD, overflow: 'visible', valign: 'top', lineColor: [225,225,225], lineWidth: 0.1 },
-      headStyles: { fillColor: COL_HEADER, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
+      styles: { fontSize: 11, cellPadding: PAD, overflow: 'visible', valign: 'top', lineColor: [225,225,225], lineWidth: 0.1 },
+      headStyles: { fillColor: COL_HEADER, textColor: [255,255,255], fontStyle: 'bold', fontSize: 10, halign: 'left' },
       columnStyles: {
         0: { cellWidth: COL_VOL_W },
         1: { cellWidth: COL_TURNI_W },
@@ -792,7 +804,7 @@ async function _generaPdf(sezioni) {
         if (data.section !== 'body') return;
         const g = groupList[data.row.index];
         if (!g) return;
-        const minH = Math.max(13, ENTRY_LINE_H * g.entries.length + 2 * PAD + 1);
+        const minH = Math.max(17, ENTRY_LINE_H * g.entries.length + 2 * PAD + 2);
         data.cell.styles.minCellHeight = minH;
         if (data.row.index % 2 === 1) data.cell.styles.fillColor = COL_ROW_ALT;
         // Suppress default text — disegnato in didDrawCell
@@ -805,65 +817,62 @@ async function _generaPdf(sezioni) {
         const x = data.cell.x;
         const y0 = data.cell.y;
         const w = data.cell.width;
+        const maxW = w - 2 * PAD;
 
         if (data.column.index === 0) {
+          // Nome 13 bold, su una sola riga (troncato con ellissi se serve)
           doc.setTextColor(20, 20, 20);
-          doc.setFontSize(11); doc.setFont(undefined, 'bold');
-          doc.text(g.nome, x + PAD, y0 + PAD + 4, { maxWidth: w - 2*PAD });
+          doc.setFontSize(13); doc.setFont(undefined, 'bold');
+          doc.text(fitWithEllipsis(g.nome, maxW), x + PAD, y0 + PAD + 4.8);
+          // Telefono 11 in blu sotto
           if (g.tel) {
-            doc.setFontSize(9); doc.setFont(undefined, 'normal');
+            doc.setFontSize(11); doc.setFont(undefined, 'normal');
             doc.setTextColor(...COL_TEL);
-            doc.text(g.tel, x + PAD, y0 + PAD + 9.5);
+            doc.text(fitWithEllipsis(g.tel, maxW), x + PAD, y0 + PAD + 11.2);
           }
         } else if (data.column.index === 1) {
           g.entries.forEach((e, i) => {
-            const lineY = y0 + PAD + 4 + i * ENTRY_LINE_H;
+            const lineY = y0 + PAD + 4.8 + i * ENTRY_LINE_H;
             const desc = turnoDesc(e.turnoObj, e.turnoEtichetta);
             const isVen = desc.day === 'Ven';
             const isSab = desc.day === 'Sab';
             const bg = isVen ? COL_BADGE_VEN_BG : isSab ? COL_BADGE_SAB_BG : COL_BADGE_DEF_BG;
             const tx = isVen ? COL_BADGE_VEN_TX : isSab ? COL_BADGE_SAB_TX : COL_BADGE_DEF_TX;
             const badgeText = (desc.day ? `${desc.day} ` : '') + desc.short;
-            doc.setFontSize(8); doc.setFont(undefined, 'bold');
+            // Badge a font 10 bold per leggibilita'
+            doc.setFontSize(10); doc.setFont(undefined, 'bold');
             const textW = doc.getTextWidth(badgeText);
-            const badgeW = textW + 4;
-            const badgeH = 4.6;
-            const badgeY = lineY - 3.2;
+            const badgeW = textW + 5;
+            const badgeH = 5.4;
+            const badgeY = lineY - 4;
             doc.setFillColor(...bg);
-            doc.roundedRect(x + PAD, badgeY, badgeW, badgeH, 0.8, 0.8, 'F');
+            doc.roundedRect(x + PAD, badgeY, badgeW, badgeH, 1, 1, 'F');
             doc.setTextColor(...tx);
-            doc.text(badgeText, x + PAD + 2, lineY);
-            // Orario
-            doc.setFontSize(9); doc.setFont(undefined, 'normal');
+            doc.text(badgeText, x + PAD + 2.5, lineY);
+            // Orario a font 11
+            doc.setFontSize(11); doc.setFont(undefined, 'normal');
             doc.setTextColor(60, 60, 60);
-            doc.text(desc.orario || '', x + PAD + badgeW + 2.5, lineY);
+            doc.text(desc.orario || '', x + PAD + badgeW + 3, lineY);
           });
         } else if (data.column.index === 2) {
           g.entries.forEach((e, i) => {
-            const lineY = y0 + PAD + 4 + i * ENTRY_LINE_H;
+            const lineY = y0 + PAD + 4.8 + i * ENTRY_LINE_H;
             const varcoLabel = e.varco != null ? `Varco ${e.varco}` : (e.jolly ? 'JOLLY' : '—');
             const txt = e.indirizzo ? `${varcoLabel} · ${e.indirizzo}` : varcoLabel;
-            doc.setFontSize(9); doc.setFont(undefined, 'normal');
+            doc.setFontSize(11); doc.setFont(undefined, 'normal');
             doc.setTextColor(40, 40, 40);
-            // Tronca se eccede la larghezza disponibile (singola riga)
-            const maxW = w - 2 * PAD;
-            let display = txt;
-            while (doc.getTextWidth(display) > maxW && display.length > 4) {
-              display = display.slice(0, -2);
-            }
-            if (display !== txt) display = display.replace(/\s+\S*$/, '') + '…';
-            doc.text(display, x + PAD, lineY);
+            doc.text(fitWithEllipsis(txt, maxW), x + PAD, lineY);
           });
         }
       },
     });
 
     // FOOTER (in fondo all'ultima pagina della sezione)
-    const footY = doc.lastAutoTable.finalY + 8;
-    doc.setFontSize(9); doc.setFont(undefined, 'bold');
+    const footY = doc.lastAutoTable.finalY + 9;
+    doc.setFontSize(11); doc.setFont(undefined, 'bold');
     doc.setTextColor(40, 40, 40);
     doc.text(`Totale volontari: ${groupList.length}`, MARGIN_L, footY);
-    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10); doc.setFont(undefined, 'normal');
     doc.setTextColor(120, 120, 120);
     doc.text('97ª ADUNATA NAZIONALE ALPINI — GENOVA 2026', PAGE_W - MARGIN_R, footY, { align: 'right' });
   });
