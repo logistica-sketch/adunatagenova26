@@ -6,7 +6,18 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 let CU = null;
 let _turni = [], _varchi = [], _volontari = [], _mezzi = [];
+let _varchiSecurity = []; // righe VARCHI_SECURITY: { id, varco, turno, created_at }
 let _assCtx = {}; // contesto modale assegna
+
+// Ritorna un Set (di stringhe) con i numeri dei varchi che hanno security per il turno indicato
+function getSecuritySetForTurno(turno) {
+  const set = new Set();
+  if (!turno) return set;
+  _varchiSecurity.forEach(r => {
+    if (r['turno'] === turno) set.add(String(r['varco']));
+  });
+  return set;
+}
 
 
 
@@ -186,12 +197,14 @@ function _eseguiRicercaVol(q) {
 async function renderDashboard() {
   setLoading(true);
   try {
-    const [{ data: turni }, { data: varchi }, { data: volontari }] = await Promise.all([
+    const [{ data: turni }, { data: varchi }, { data: volontari }, { data: secRows }] = await Promise.all([
       sb.from('TURNI').select('*').order('Etichetta'),
       sb.from('VARCHI').select('*').order('VARCO'),
       sb.from('VOLONTARI').select('*'),
+      sb.from('VARCHI_SECURITY').select('*'),
     ]);
     _turni = turni || []; _varchi = varchi || []; _volontari = volontari || [];
+    _varchiSecurity = secRows || [];
 
     // Mostra il pannello di ricerca solo per ACCESSO FULL
     const sp = document.getElementById('dash-search-panel');
@@ -204,6 +217,9 @@ async function renderDashboard() {
       const slotsPerVarco = isNotturno ? 1 : 2;
       const totSlot = _varchi.length * slotsPerVarco;
 
+      // Set varchi con security per QUESTO turno
+      const secSet = getSecuritySetForTurno(t['Etichetta']);
+
       // Logica posizionale: per ogni varco, i primi 2 per id sono principali
       let principali = 0;
       let completi = 0, parziali = 0, scoperti = 0;
@@ -211,7 +227,7 @@ async function renderDashboard() {
         const nelVarco = _volontari
           .filter(x => x['TURNO'] === t['Etichetta'] && x['VARCO'] == v['VARCO'])
           .sort((a, b) => a.id - b.id);
-        const hasSec = !!v['SECURITY'];
+        const hasSec = secSet.has(String(v['VARCO']));
         if (isNotturno) {
           const haCop = nelVarco.length >= 1 || hasSec;
           if (haCop) { completi++; principali++; }
@@ -795,14 +811,16 @@ let _mezziTurni = [];
 async function renderGriglia() {
   setLoading(true);
   try {
-    const [{ data: turni }, { data: varchi }, { data: volontari }, { data: mezzi }] = await Promise.all([
+    const [{ data: turni }, { data: varchi }, { data: volontari }, { data: mezzi }, { data: secRows }] = await Promise.all([
       sb.from('TURNI').select('*').order('Etichetta'),
       sb.from('VARCHI').select('*').order('VARCO'),
       sb.from('VOLONTARI').select('*'),
       sb.from('MEZZI').select('*'),
+      sb.from('VARCHI_SECURITY').select('*'),
     ]);
     _turni = turni || []; _varchi = varchi || [];
     _volontari = volontari || []; _mezzi = mezzi || [];
+    _varchiSecurity = secRows || [];
 
     // Aggiorna intestazione in base al tipo di accesso
     const isSezGriglia = CU && (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO');
@@ -843,6 +861,8 @@ function renderTurnoAttivo() {
   const isSez = CU && (CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE' || CU['TIPOLOGIA'] === 'ACCESSO SEZIONALE_RO');
   const miaSez = isSez ? (CU['SEZIONE'] || '') : null;
   const volTurno = _volontari.filter(v => v['TURNO'] === turno);
+  // Set varchi con security per il turno attivo (sorgente: VARCHI_SECURITY)
+  const securitySet = getSecuritySetForTurno(turno);
 
   // Confronto sezione fuzzy: case-insensitive + startsWith bidirezionale.
   // "CASALE" matcha "CASALE MONFERRATO" e viceversa.
@@ -893,7 +913,7 @@ function renderTurnoAttivo() {
   let completi=0, parziali=0, scoperti=0, totPrinc=0, totMezziGriglia=0;
   _varchi.forEach(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
-    const hasSec = !!v['SECURITY'];
+    const hasSec = securitySet.has(String(v['VARCO']));
     if (isNotturno) {
       const haCop = principali.length >= 1 || hasSec;
       if (haCop) completi++;
@@ -931,7 +951,7 @@ function renderTurnoAttivo() {
 
     let statoHtml;
     if (isNotturno) {
-      const haCop = principali.length >= 1 || !!v['SECURITY'];
+      const haCop = principali.length >= 1 || securitySet.has(String(v['VARCO']));
       const haSurp = principali.length >= 2 || (principali.length >= 1 && extra.length > 0);
       if (haSurp) statoHtml = `<span class="stato-surplus">SURPLUS</span>`;
       else if (haCop) statoHtml = `<span class="stato-completo">COMPLETO</span>`;
@@ -1007,13 +1027,13 @@ function renderTurnoAttivo() {
     const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
     const dropAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
 
-    // SECURITY è un booleano fisso sul varco, indipendente dal turno
-    const vHasSec = !!v['SECURITY'];
+    // SECURITY è per turno+varco (tabella VARCHI_SECURITY)
+    const vHasSec = securitySet.has(String(v['VARCO']));
     const securityBadge = vHasSec
       ? `<div class="security-chip"><div class="security-chip-name">Security</div><div class="security-chip-sub">Cortesy Solution SRL</div></div>`
       : '';
     const securityBtn = isFullGriglia
-      ? `<button class="security-toggle-btn${vHasSec ? ' active' : ''}" onclick="toggleSecurity(${v['VARCO']})" title="${vHasSec ? 'Rimuovi Security' : 'Aggiungi Security'}">${vHasSec ? '✕ Security' : '+ Security'}</button>`
+      ? `<button class="security-toggle-btn${vHasSec ? ' active' : ''}" onclick="toggleSecurity(${v['VARCO']}, '${turno}')" title="${vHasSec ? 'Rimuovi Security' : 'Aggiungi Security'}">${vHasSec ? '✕ Security' : '+ Security'}</button>`
       : '';
 
     return `<tr${isMiaRiga ? ' class="mia-sezione-row"' : ''}>
@@ -1194,26 +1214,29 @@ function showSavedToast(msg) {
   toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 2000);
 }
 
-// ── TOGGLE SECURITY VARCO ─────────────────────────────────────
-async function toggleSecurity(varcoNum) {
-  const varco = _varchi.find(v => v['VARCO'] == varcoNum);
-  if (!varco) return;
-  const newVal = !varco['SECURITY'];
-  // Usa il valore reale dell'oggetto (tipo corretto) invece del parametro HTML
-  const varcoKey = varco['VARCO'];
+// ── TOGGLE SECURITY VARCO+TURNO (tabella VARCHI_SECURITY) ────
+async function toggleSecurity(varcoNum, turno) {
+  if (!turno) return;
+  const matches = (r) => r['turno'] === turno && Number(r['varco']) === Number(varcoNum);
+  const exists = _varchiSecurity.some(matches);
   setLoading(true);
   try {
-    const { data: aggiornati, error } = await sb.from('VARCHI')
-      .update({ SECURITY: newVal })
-      .eq('VARCO', varcoKey)
-      .select('VARCO, SECURITY');
-    if (error) throw error;
-    // Sincronizza _varchi con i dati reali restituiti dal DB
-    (aggiornati || []).forEach(row => {
-      const v = _varchi.find(x => x['VARCO'] == row['VARCO']);
-      if (v) v['SECURITY'] = row['SECURITY'];
-    });
-    showSavedToast(newVal ? 'Security aggiunta ✓' : 'Security rimossa ✓');
+    if (exists) {
+      const { error } = await sb.from('VARCHI_SECURITY')
+        .delete()
+        .eq('varco', varcoNum)
+        .eq('turno', turno);
+      if (error) throw error;
+      _varchiSecurity = _varchiSecurity.filter(r => !matches(r));
+      showSavedToast('Security rimossa ✓');
+    } else {
+      const { data, error } = await sb.from('VARCHI_SECURITY')
+        .insert({ varco: varcoNum, turno: turno })
+        .select('*');
+      if (error) throw error;
+      if (data && data[0]) _varchiSecurity.push(data[0]);
+      showSavedToast('Security aggiunta ✓');
+    }
     renderTurnoAttivo();
   } catch(e) { console.error(e); alert('Errore Security: ' + e.message); }
   finally { setLoading(false); }
