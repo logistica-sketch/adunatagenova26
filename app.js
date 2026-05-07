@@ -675,108 +675,197 @@ async function _generaPdf(sezioni) {
   const { jsPDF } = window.jspdf;
   const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
-  const verde = [26, 110, 46];
-  const W = 182;
+
+  // Palette
+  const COL_HEADER     = [26, 61, 28];   // #1a3d1c
+  const COL_SEZBAR     = [44, 95, 46];   // #2C5F2E
+  const COL_BADGE_VEN_BG = [234, 243, 222]; // #EAF3DE
+  const COL_BADGE_VEN_TX = [39, 80, 10];    // #27500A
+  const COL_BADGE_SAB_BG = [230, 241, 251]; // #E6F1FB
+  const COL_BADGE_SAB_TX = [12, 68, 124];   // #0C447C
+  const COL_BADGE_DEF_BG = [238, 238, 238];
+  const COL_BADGE_DEF_TX = [80, 80, 80];
+  const COL_TEL          = [21, 101, 192];  // blu telefono
+  const COL_ROW_ALT      = [250, 250, 248]; // #fafaf8
+
+  const PAGE_W = 210;
+  const MARGIN_L = 14, MARGIN_R = 14;
+  const W = PAGE_W - MARGIN_L - MARGIN_R; // 182
+
+  // Larghezze colonne (volontario ~50mm, turni ~55mm, varchi resto)
+  const COL_VOL_W   = 50;
+  const COL_TURNI_W = 55;
+  const COL_VAR_W   = W - COL_VOL_W - COL_TURNI_W; // 77
+
+  const ENTRY_LINE_H = 6;   // mm per ogni riga turno/varco
+  const PAD = 2.5;
+
+  // Helpers
+  const turnoNum = (et) => { const m = (et||'').match(/(\d+)/); return m ? parseInt(m[1],10) : 9999; };
+  const turnoDesc = (turnoObj, etichetta) => {
+    const num = turnoNum(etichetta);
+    const nome = (turnoObj && turnoObj['NOME TURNO'] || '').trim();
+    let day = '';
+    if (/Venerd/i.test(nome)) day = 'Ven';
+    else if (/Sabato/i.test(nome)) day = 'Sab';
+    else if (/Domenica/i.test(nome)) day = 'Dom';
+    else if (/Luned/i.test(nome)) day = 'Lun';
+    else if (/Marted/i.test(nome)) day = 'Mar';
+    else if (/Mercoled/i.test(nome)) day = 'Mer';
+    else if (/Gioved/i.test(nome)) day = 'Gio';
+    let orario = '';
+    const m = nome.match(/(\d{1,2}[:\.]\d{2})\s*-\s*(\d{1,2}[:\.]\d{2})/);
+    if (m) orario = `${m[1].replace('.', ':')}-${m[2].replace('.', ':')}`;
+    return { day, short: `T${num}`, orario };
+  };
+
+  // Header + barra sezione (disegnati per ogni sezione su prima pagina)
+  function drawTopBands(sez, voloUnici) {
+    // Banda intestazione (full bleed)
+    doc.setFillColor(...COL_HEADER);
+    doc.rect(0, 0, PAGE_W, 22, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(13); doc.setFont(undefined, 'bold');
+    doc.text('97ª ADUNATA NAZIONALE ALPINI — GENOVA 2026', MARGIN_L, 10);
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.text('Report Volontari per Sezione', MARGIN_L, 16);
+    doc.setFontSize(9);
+    doc.text(`Stampato il ${oggi}`, PAGE_W - MARGIN_R, 16, { align: 'right' });
+
+    // Barra sezione
+    doc.setFillColor(...COL_SEZBAR);
+    doc.rect(0, 22, PAGE_W, 12, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(13); doc.setFont(undefined, 'bold');
+    doc.text(`SEZIONE: ${sez}`, MARGIN_L, 30);
+    doc.setFontSize(10); doc.setFont(undefined, 'normal');
+    doc.text(`${voloUnici} volontari`, PAGE_W - MARGIN_R, 30, { align: 'right' });
+  }
 
   sezioni.forEach((sez, idx) => {
     if (idx > 0) doc.addPage();
-    let y = 14;
     const sezLow = sez.trim().toLowerCase();
 
-    // ── Intestazione ──────────────────────────────────────────
-    doc.setFillColor(...verde);
-    doc.rect(14, y, W, 12, 'F');
-    doc.setFontSize(11); doc.setTextColor(255,255,255); doc.setFont(undefined, 'bold');
-    doc.text('97ª ADUNATA NAZIONALE ALPINI – GENOVA 2026', 14 + W/2, y + 7.5, { align:'center' });
-    y += 20;
-
-    doc.setTextColor(0,0,0); doc.setFontSize(18); doc.setFont(undefined, 'bold');
-    doc.text(`SEZIONE: ${sez}`, 14 + W/2, y, { align:'center' });
-    y += 10;
-
-    doc.setFontSize(9); doc.setFont(undefined, 'normal');
-    doc.text(`Stampato il: ${oggi}`, 14 + W/2, y, { align:'center' });
-    y += 14;
-
-    // ── Volontari ─────────────────────────────────────────────
-    const volSez    = volontari.filter(v => (v['SEZIONE']||'').trim().toLowerCase() === sezLow);
-    const principali = volSez.filter(v => !v['JOLLY'] && v['VARCO']);
-    const extra      = volSez.filter(v =>  v['JOLLY'] || !v['VARCO']);
-
-    doc.setFontSize(12); doc.setFont(undefined, 'bold');
-    doc.setTextColor(...verde);
-    doc.text(`VOLONTARI (${volSez.length})`, 14, y);
-    doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
-    y += 8;
-
-    // Turno compatto: "Ven 07:00-12:00"
-    const turnoNum = (et) => { const m = (et||'').match(/(\d+)/); return m ? parseInt(m[1],10) : 9999; };
-    const formatTurnoCompact = (turnoObj, etichetta) => {
-      const nome = (turnoObj && turnoObj['NOME TURNO'] || '').trim();
-      if (!nome) return etichetta || '—';
-      return nome
-        .replace(/Venerd[ìi]/gi, 'Ven')
-        .replace(/Sabato/gi, 'Sab')
-        .replace(/Domenica/gi, 'Dom')
-        .replace(/Luned[ìi]/gi, 'Lun')
-        .replace(/Marted[ìi]/gi, 'Mar')
-        .replace(/Mercoled[ìi]/gi, 'Mer')
-        .replace(/Gioved[ìi]/gi, 'Gio')
-        .replace(/\s*-\s*/g, '-')
-        .replace(/\s+/g, ' ')
-        .trim();
-    };
-
-    // Ordina: TURNO ASC (numerico), poi NOME_COGNOME ASC
-    const volSorted = [...volSez].sort((a, b) => {
-      const na = turnoNum(a['TURNO']), nb = turnoNum(b['TURNO']);
-      if (na !== nb) return na - nb;
-      return (a['NOME_COGNOME']||'').localeCompare(b['NOME_COGNOME']||'', 'it', { sensitivity:'base' });
-    });
-
-    // Indici delle righe che iniziano un nuovo turno (escluso il primo)
-    const separatorRows = new Set();
-    let prevTurno = null;
-    volSorted.forEach((v, i) => {
-      if (i > 0 && v['TURNO'] !== prevTurno) separatorRows.add(i);
-      prevTurno = v['TURNO'];
-    });
-
-    const volRows = volSorted.map(v => {
+    // Raggruppa volontari della sezione per persona (NOME_COGNOME + TELEFONO)
+    const volSez = volontari.filter(v => (v['SEZIONE']||'').trim().toLowerCase() === sezLow);
+    const groupsMap = new Map();
+    volSez.forEach(v => {
+      const key = `${(v['NOME_COGNOME']||'').trim().toUpperCase()}|${(v['TELEFONO']||'').trim()}`;
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, { nome: v['NOME_COGNOME']||'—', tel: v['TELEFONO']||'', entries: [] });
+      }
       const turnoObj = turni.find(t => t['Etichetta'] === v['TURNO']);
-      const turnoStr = formatTurnoCompact(turnoObj, v['TURNO']);
       const varcoRiga = varchi.find(vx => vx['VARCO'] == v['VARCO']);
-      const varcoStr  = v['VARCO'] != null ? `${v['VARCO']}` : (v['JOLLY'] ? 'JOLLY' : '—');
-      const indir     = varcoRiga ? (varcoRiga['INDIRIZZO'] || '—') : '—';
-      return [v['NOME_COGNOME']||'—', turnoStr, varcoStr, indir, v['TELEFONO']||'—'];
+      groupsMap.get(key).entries.push({
+        turnoEtichetta: v['TURNO'],
+        turnoObj,
+        varco: v['VARCO'],
+        indirizzo: varcoRiga ? (varcoRiga['INDIRIZZO'] || '') : '',
+        jolly: !!v['JOLLY'],
+      });
     });
+    const groupList = [...groupsMap.values()].sort((a, b) =>
+      a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' })
+    );
+    groupList.forEach(g => g.entries.sort((a, b) =>
+      turnoNum(a.turnoEtichetta) - turnoNum(b.turnoEtichetta)
+    ));
+
+    drawTopBands(sez, groupList.length);
+
+    const startY = 38;
+    const body = groupList.map(g => [{ content: '' }, { content: '' }, { content: '' }]);
 
     doc.autoTable({
-      startY: y,
-      head: [['Nome Cognome', 'Turno', 'Varco', 'Indirizzo Varco', 'Telefono']],
-      body: volRows.length ? volRows : [['Nessun volontario','','','','']],
-      styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
-      headStyles: { fillColor: verde, fontStyle: 'bold', fontSize: 8.5 },
-      // Turno piu' largo per stare su una riga; INDIRIZZO accorciato
-      columnStyles: { 0:{cellWidth:48}, 1:{cellWidth:44}, 2:{cellWidth:12}, 3:{cellWidth:50}, 4:{cellWidth:28} },
-      margin: { left: 14, right: 14 },
-      didDrawPage: (d) => { y = d.cursor.y; },
+      startY,
+      head: [['VOLONTARIO', 'TURNI', 'VARCO ASSEGNATO']],
+      body: body.length ? body : [[{ content: 'Nessun volontario in questa sezione', colSpan: 3, styles: { halign: 'center', textColor: [120,120,120] } }]],
+      margin: { left: MARGIN_L, right: MARGIN_R },
+      styles: { fontSize: 9, cellPadding: PAD, overflow: 'visible', valign: 'top', lineColor: [225,225,225], lineWidth: 0.1 },
+      headStyles: { fillColor: COL_HEADER, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, halign: 'left' },
+      columnStyles: {
+        0: { cellWidth: COL_VOL_W },
+        1: { cellWidth: COL_TURNI_W },
+        2: { cellWidth: COL_VAR_W },
+      },
+      didParseCell: (data) => {
+        if (data.section !== 'body') return;
+        const g = groupList[data.row.index];
+        if (!g) return;
+        const minH = Math.max(13, ENTRY_LINE_H * g.entries.length + 2 * PAD + 1);
+        data.cell.styles.minCellHeight = minH;
+        if (data.row.index % 2 === 1) data.cell.styles.fillColor = COL_ROW_ALT;
+        // Suppress default text — disegnato in didDrawCell
+        data.cell.text = [''];
+      },
       didDrawCell: (data) => {
-        // Separatore leggero tra turni diversi
-        if (data.section === 'body' && data.column.index === 0 && separatorRows.has(data.row.index)) {
-          doc.setDrawColor(200, 200, 200);
-          doc.setLineWidth(0.3);
-          doc.line(14, data.cell.y, 14 + W, data.cell.y);
+        if (data.section !== 'body') return;
+        const g = groupList[data.row.index];
+        if (!g) return;
+        const x = data.cell.x;
+        const y0 = data.cell.y;
+        const w = data.cell.width;
+
+        if (data.column.index === 0) {
+          doc.setTextColor(20, 20, 20);
+          doc.setFontSize(11); doc.setFont(undefined, 'bold');
+          doc.text(g.nome, x + PAD, y0 + PAD + 4, { maxWidth: w - 2*PAD });
+          if (g.tel) {
+            doc.setFontSize(9); doc.setFont(undefined, 'normal');
+            doc.setTextColor(...COL_TEL);
+            doc.text(g.tel, x + PAD, y0 + PAD + 9.5);
+          }
+        } else if (data.column.index === 1) {
+          g.entries.forEach((e, i) => {
+            const lineY = y0 + PAD + 4 + i * ENTRY_LINE_H;
+            const desc = turnoDesc(e.turnoObj, e.turnoEtichetta);
+            const isVen = desc.day === 'Ven';
+            const isSab = desc.day === 'Sab';
+            const bg = isVen ? COL_BADGE_VEN_BG : isSab ? COL_BADGE_SAB_BG : COL_BADGE_DEF_BG;
+            const tx = isVen ? COL_BADGE_VEN_TX : isSab ? COL_BADGE_SAB_TX : COL_BADGE_DEF_TX;
+            const badgeText = (desc.day ? `${desc.day} ` : '') + desc.short;
+            doc.setFontSize(8); doc.setFont(undefined, 'bold');
+            const textW = doc.getTextWidth(badgeText);
+            const badgeW = textW + 4;
+            const badgeH = 4.6;
+            const badgeY = lineY - 3.2;
+            doc.setFillColor(...bg);
+            doc.roundedRect(x + PAD, badgeY, badgeW, badgeH, 0.8, 0.8, 'F');
+            doc.setTextColor(...tx);
+            doc.text(badgeText, x + PAD + 2, lineY);
+            // Orario
+            doc.setFontSize(9); doc.setFont(undefined, 'normal');
+            doc.setTextColor(60, 60, 60);
+            doc.text(desc.orario || '', x + PAD + badgeW + 2.5, lineY);
+          });
+        } else if (data.column.index === 2) {
+          g.entries.forEach((e, i) => {
+            const lineY = y0 + PAD + 4 + i * ENTRY_LINE_H;
+            const varcoLabel = e.varco != null ? `Varco ${e.varco}` : (e.jolly ? 'JOLLY' : '—');
+            const txt = e.indirizzo ? `${varcoLabel} · ${e.indirizzo}` : varcoLabel;
+            doc.setFontSize(9); doc.setFont(undefined, 'normal');
+            doc.setTextColor(40, 40, 40);
+            // Tronca se eccede la larghezza disponibile (singola riga)
+            const maxW = w - 2 * PAD;
+            let display = txt;
+            while (doc.getTextWidth(display) > maxW && display.length > 4) {
+              display = display.slice(0, -2);
+            }
+            if (display !== txt) display = display.replace(/\s+\S*$/, '') + '…';
+            doc.text(display, x + PAD, lineY);
+          });
         }
       },
     });
-    y = doc.lastAutoTable.finalY + 14;
 
-    // ── Riepilogo ─────────────────────────────────────────────
+    // FOOTER (in fondo all'ultima pagina della sezione)
+    const footY = doc.lastAutoTable.finalY + 8;
     doc.setFontSize(9); doc.setFont(undefined, 'bold');
-    doc.text('RIEPILOGO', 14, y); y += 5;
+    doc.setTextColor(40, 40, 40);
+    doc.text(`Totale volontari: ${groupList.length}`, MARGIN_L, footY);
     doc.setFont(undefined, 'normal');
-    doc.text(`Volontari: ${volSez.length}`, 14, y);
+    doc.setTextColor(120, 120, 120);
+    doc.text('97ª ADUNATA NAZIONALE ALPINI — GENOVA 2026', PAGE_W - MARGIN_R, footY, { align: 'right' });
   });
 
   const tag  = sezioni.length === 1 ? sezioni[0].replace(/\s+/g,'_') : 'TUTTE';
