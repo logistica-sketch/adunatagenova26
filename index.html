@@ -2526,6 +2526,9 @@ function renderTurnoAttivo() {
     <div class="ts-card"><div class="ts-num arancio">${totExtra}</div><div class="ts-label">Extra</div></div>
   `;
 
+  // isFull calcolato una volta sola fuori dal loop (costante per tutta la render)
+  const isFullGriglia = CU && CU['TIPOLOGIA'] === 'ACCESSO FULL';
+
   const tbody = document.getElementById('varchi-tbody');
   tbody.innerHTML = _varchi.map(v => {
     const { principali, extra } = splitVarco(v['VARCO']);
@@ -2608,13 +2611,13 @@ function renderTurnoAttivo() {
     const isMiaRiga = isSez && v['SEZIONI'] === miaSez;
     const dropAttrs = isSez ? '' : `ondragover="dragOver(event)" ondrop="dropOnVarco(event,${v['VARCO']},'${turno}')" ondragleave="dragLeave(event)"`;
 
-    const isFull2 = CU && CU['TIPOLOGIA'] === 'ACCESSO FULL';
-    const hasSec2 = !!v['SECURITY'];
-    const securityBadge = hasSec2
+    // SECURITY è un booleano fisso sul varco, indipendente dal turno
+    const vHasSec = !!v['SECURITY'];
+    const securityBadge = vHasSec
       ? `<div class="security-chip"><div class="security-chip-name">Security</div><div class="security-chip-sub">Cortesy Solution SRL</div></div>`
       : '';
-    const securityBtn = isFull2
-      ? `<button class="security-toggle-btn${hasSec2 ? ' active' : ''}" onclick="toggleSecurity(${v['VARCO']})" title="${hasSec2 ? 'Rimuovi Security' : 'Aggiungi Security'}">${hasSec2 ? '✕ Security' : '+ Security'}</button>`
+    const securityBtn = isFullGriglia
+      ? `<button class="security-toggle-btn${vHasSec ? ' active' : ''}" onclick="toggleSecurity(${v['VARCO']})" title="${vHasSec ? 'Rimuovi Security' : 'Aggiungi Security'}">${vHasSec ? '✕ Security' : '+ Security'}</button>`
       : '';
 
     return `<tr${isMiaRiga ? ' class="mia-sezione-row"' : ''}>
