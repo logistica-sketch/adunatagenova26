@@ -709,13 +709,12 @@ async function _generaPdf(sezioni) {
     doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
     y += 8;
 
-    // Turno compatto: "T2 - Ven 07:00-12:00"
+    // Turno compatto: "Ven 07:00-12:00"
     const turnoNum = (et) => { const m = (et||'').match(/(\d+)/); return m ? parseInt(m[1],10) : 9999; };
     const formatTurnoCompact = (turnoObj, etichetta) => {
-      const tShort = `T${turnoNum(etichetta)}`;
       const nome = (turnoObj && turnoObj['NOME TURNO'] || '').trim();
-      if (!nome) return etichetta ? tShort : '—';
-      const compact = nome
+      if (!nome) return etichetta || '—';
+      return nome
         .replace(/Venerd[ìi]/gi, 'Ven')
         .replace(/Sabato/gi, 'Sab')
         .replace(/Domenica/gi, 'Dom')
@@ -726,7 +725,6 @@ async function _generaPdf(sezioni) {
         .replace(/\s*-\s*/g, '-')
         .replace(/\s+/g, ' ')
         .trim();
-      return `${tShort} - ${compact}`;
     };
 
     // Ordina: TURNO ASC (numerico), poi NOME_COGNOME ASC
