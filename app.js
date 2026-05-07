@@ -713,9 +713,44 @@ async function _generaPdf(sezioni) {
     doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
     y += 8;
 
-    const volRows = [...principali, ...extra].map(v => {
+    // Turno compatto: "T2 - Ven 07:00-12:00"
+    const turnoNum = (et) => { const m = (et||'').match(/(\d+)/); return m ? parseInt(m[1],10) : 9999; };
+    const formatTurnoCompact = (turnoObj, etichetta) => {
+      const tShort = `T${turnoNum(etichetta)}`;
+      const nome = (turnoObj && turnoObj['NOME TURNO'] || '').trim();
+      if (!nome) return etichetta ? tShort : '—';
+      const compact = nome
+        .replace(/Venerd[ìi]/gi, 'Ven')
+        .replace(/Sabato/gi, 'Sab')
+        .replace(/Domenica/gi, 'Dom')
+        .replace(/Luned[ìi]/gi, 'Lun')
+        .replace(/Marted[ìi]/gi, 'Mar')
+        .replace(/Mercoled[ìi]/gi, 'Mer')
+        .replace(/Gioved[ìi]/gi, 'Gio')
+        .replace(/\s*-\s*/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return `${tShort} - ${compact}`;
+    };
+
+    // Ordina: TURNO ASC (numerico), poi NOME_COGNOME ASC
+    const volSorted = [...volSez].sort((a, b) => {
+      const na = turnoNum(a['TURNO']), nb = turnoNum(b['TURNO']);
+      if (na !== nb) return na - nb;
+      return (a['NOME_COGNOME']||'').localeCompare(b['NOME_COGNOME']||'', 'it', { sensitivity:'base' });
+    });
+
+    // Indici delle righe che iniziano un nuovo turno (escluso il primo)
+    const separatorRows = new Set();
+    let prevTurno = null;
+    volSorted.forEach((v, i) => {
+      if (i > 0 && v['TURNO'] !== prevTurno) separatorRows.add(i);
+      prevTurno = v['TURNO'];
+    });
+
+    const volRows = volSorted.map(v => {
       const turnoObj = turni.find(t => t['Etichetta'] === v['TURNO']);
-      const turnoStr = turnoObj ? (turnoObj['NOME TURNO'] || v['TURNO']) : (v['TURNO'] || '—');
+      const turnoStr = formatTurnoCompact(turnoObj, v['TURNO']);
       const varcoRiga = varchi.find(vx => vx['VARCO'] == v['VARCO']);
       const varcoStr  = v['VARCO'] != null ? `${v['VARCO']}` : (v['JOLLY'] ? 'JOLLY' : '—');
       const indir     = varcoRiga ? (varcoRiga['INDIRIZZO'] || '—') : '—';
@@ -728,9 +763,18 @@ async function _generaPdf(sezioni) {
       body: volRows.length ? volRows : [['Nessun volontario','','','','']],
       styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
       headStyles: { fillColor: verde, fontStyle: 'bold', fontSize: 8.5 },
-      columnStyles: { 0:{cellWidth:52}, 1:{cellWidth:28}, 2:{cellWidth:14}, 3:{cellWidth:58}, 4:{cellWidth:30} },
+      // Turno piu' largo per stare su una riga; INDIRIZZO accorciato
+      columnStyles: { 0:{cellWidth:48}, 1:{cellWidth:44}, 2:{cellWidth:12}, 3:{cellWidth:50}, 4:{cellWidth:28} },
       margin: { left: 14, right: 14 },
       didDrawPage: (d) => { y = d.cursor.y; },
+      didDrawCell: (data) => {
+        // Separatore leggero tra turni diversi
+        if (data.section === 'body' && data.column.index === 0 && separatorRows.has(data.row.index)) {
+          doc.setDrawColor(200, 200, 200);
+          doc.setLineWidth(0.3);
+          doc.line(14, data.cell.y, 14 + W, data.cell.y);
+        }
+      },
     });
     y = doc.lastAutoTable.finalY + 14;
 
