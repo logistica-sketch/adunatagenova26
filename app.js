@@ -651,22 +651,18 @@ async function _generaPdf(sezioni) {
 
   // ── Query fresche al momento della generazione ─────────────
   setLoading(true);
-  let volontari, mezzi, varchi, turni;
+  let volontari, varchi, turni;
   try {
     const isFull = CU['TIPOLOGIA'] === 'ACCESSO FULL';
     const miaSez = CU['SEZIONE'] || '';
-    const [r1, r2, r3, r4] = await Promise.all([
+    const [r1, r3, r4] = await Promise.all([
       isFull
         ? sb.from('VOLONTARI').select('*')
         : sb.from('VOLONTARI').select('*').eq('SEZIONE', miaSez),
-      isFull
-        ? sb.from('MEZZI').select('*')
-        : sb.from('MEZZI').select('*').eq('SEZIONE', miaSez),
       sb.from('VARCHI').select('*'),
       sb.from('TURNI').select('*'),
     ]);
     volontari = r1.data || [];
-    mezzi     = r2.data || [];
     varchi    = r3.data || [];
     turni     = r4.data || [];
   } catch(e) {
@@ -778,44 +774,11 @@ async function _generaPdf(sezioni) {
     });
     y = doc.lastAutoTable.finalY + 14;
 
-    // ── Mezzi ─────────────────────────────────────────────────
-    const mezSez = mezzi.filter(m => (m['SEZIONE']||'').trim().toLowerCase() === sezLow);
-
-    doc.setFontSize(12); doc.setFont(undefined, 'bold');
-    doc.setTextColor(...verde);
-    doc.text(`MEZZI (${mezSez.length})`, 14, y);
-    doc.setTextColor(0,0,0); doc.setFont(undefined, 'normal');
-    y += 8;
-
-    const mezRows = mezSez.map(m => {
-      const varcoRigaMezzo = m['VARCO'] != null ? varchi.find(vx => vx['VARCO'] == m['VARCO']) : null;
-      const indirMezzo = varcoRigaMezzo ? (varcoRigaMezzo['INDIRIZZO'] || '—') : '—';
-      return [
-        m['TARGA']||'—', m['DESCRIZIONE']||'—', m['TIPOLOGIA']||'—',
-        m['UTILIZZO']||'—',
-        m['VARCO'] != null ? `${m['VARCO']}` : '—',
-        indirMezzo,
-      ];
-    });
-
-    doc.autoTable({
-      startY: y,
-      head: [['Targa','Descrizione','Tipologia','Utilizzo','Varco','Indirizzo Varco']],
-      body: mezRows.length ? mezRows : [['Nessun mezzo','','','','','']],
-      styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
-      headStyles: { fillColor: verde, fontStyle: 'bold', fontSize: 8.5 },
-      columnStyles: { 0:{cellWidth:22}, 1:{cellWidth:40}, 2:{cellWidth:24}, 3:{cellWidth:26}, 4:{cellWidth:14}, 5:{cellWidth:42} },
-      margin: { left: 14, right: 14 },
-    });
-    y = doc.lastAutoTable.finalY + 14;
-
     // ── Riepilogo ─────────────────────────────────────────────
-    const totVarchi = mezSez.filter(m => m['UTILIZZO'] === 'VARCHI').length;
     doc.setFontSize(9); doc.setFont(undefined, 'bold');
     doc.text('RIEPILOGO', 14, y); y += 5;
     doc.setFont(undefined, 'normal');
-    doc.text(`Volontari: ${volSez.length}  |  Principali: ${principali.length}  |  Extra / Jolly: ${extra.length}`, 14, y); y += 4.5;
-    doc.text(`Mezzi: ${mezSez.length}  |  Ai varchi: ${totVarchi}`, 14, y);
+    doc.text(`Volontari: ${volSez.length}`, 14, y);
   });
 
   const tag  = sezioni.length === 1 ? sezioni[0].replace(/\s+/g,'_') : 'TUTTE';
